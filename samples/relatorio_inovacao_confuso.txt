@@ -1,0 +1,15 @@
+RELATORIO EXECUTIVO - PROGRAMA PULSAR
+
+Sumario rapido:
+  O laboratorio de inovacao identificou tres pilotos com alto potencial,
+  porem a area de controladoria aponta riscos de capitalizacao.
+
+Destaques tecnicos:
+  - Algoritmo preditivo integrando dados sensiveis de clientes legacy.
+  - Prova de conceito de assinatura digital com dependencia regulatoria.
+  - Bot de atendimento que utiliza dados anonimizados parcialmente.
+
+Alertas:
+  * Necessidade de consulta ao juridico sobre tratamento de dados.
+  * Reavaliacao das garantias de compliance LGPD antes do rollout.
+  * Abertura de chamado com o comite etico por uso de base historica.

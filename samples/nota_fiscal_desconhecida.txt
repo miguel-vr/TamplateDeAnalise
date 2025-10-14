@@ -1,0 +1,20 @@
+NOTA FISCAL ELETRONICA (MODELO SIMPLIFICADO)
+
+Razao social: Comercial Horizonte LTDA
+CNPJ: 12.345.678/0001-90
+Numero NF: 998877-XX
+Data emissao: 18/09/2025
+
+Itens:
+  1) Servico consultivo premium .................. R$ 4.800,00
+  2) Taxa extraordinaria nao detalhada ........... R$   950,00
+  3) Ajuste financeiro - origem nao informada .... R$ 2.120,00
+
+Observacao fiscal:
+  Documento enviado fora do prazo contratual.
+  Codigo CNAE nao informado pelo solicitante.
+  Tributacao definida posterior ao fechamento contabile.
+
+Informacoes adicionais ao fisco:
+  Solicitado reenquadramento como servico educacional, mas a natureza
+  dos itens indica consultoria financeira. Revisao obrigatoria.

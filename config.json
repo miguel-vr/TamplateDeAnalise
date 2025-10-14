@@ -1,0 +1,23 @@
+{
+  "api_key": "",
+  "model": "gpt-5",
+  "confidence_threshold": 0.8,
+  "polling_interval": 10,
+  "log_level": "INFO",
+  "log_file": "logs/activity.jsonl",
+  "text_log_file": "logs/system.log",
+  "max_retries": 2,
+  "cross_validation_model": "gpt-5",
+  "knowledge_base_path": "knowledge.json",
+  "feedback_polling_interval": 10,
+  "processing_workers": 2,
+  "temperature": 1.0,
+  "request_timeout": 60,
+  "azure_keyvault_url": "",
+  "use_azure": false,
+  "azure_endpoint": "",
+  "azure_api_key": "",
+  "azure_deployment": "",
+  "azure_api_version": "2024-02-01",
+  "teams_webhook_url": ""
+}

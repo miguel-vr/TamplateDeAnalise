@@ -1,0 +1,11 @@
+Documento analisado: plano_transformacao_digital_2030.pdf
+Categoria atribuída: tecnologia
+Tema: Transformação Digital 2030 com estratégia multi-cloud híbrida, segurança zero trust e governança de dados alinhada a Basel IV/GDPR/LGPD no setor financeiro
+Confiança estimada: 90.00%
+
+Marque com X a opção desejada e preencha observações se necessário.
+[X] Correto
+[ ] Incorreto
+Observações:
+
+Após preencher, salve este arquivo com o mesmo nome e mova para a pasta 'folders/feedback/'.
