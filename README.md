@@ -88,7 +88,7 @@
 - **Criando um `.env` rapidamente (PowerShell)**:
   ```powershell
   @"
-  AZURE_OPENAI_ENDPOINT=https://api-gpt.b3.com.br/internal-api/b3gpt-llms/v1/
+  AZURE_OPENAI_ENDPOINT=COLE_SEU_OPENAI_ENPOINT
   AZURE_OPENAI_KEY=COLE_SUA_CHAVE_AQUI
   AZURE_OPENAI_DEPLOYMENT=gpt4o-mini
   OPENAI_API_VERSION=2024-08-01-preview
