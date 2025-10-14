@@ -85,6 +85,18 @@
 - `knowledge_base_path`: caminho do arquivo JSON da base de conhecimento.
 - `teams_webhook_url`: URL do webhook do Microsoft Teams para envio dos Adaptive Cards (string vazia desativa).
 - Todos os parametros podem ser sobrescritos via variaveis de ambiente listadas em `load_config()` (ex.: `CLASSIFIER_POLL_INTERVAL`, `TEAMS_WEBHOOK_URL`). Valores numericos sao convertidos automaticamente.
+- **Criando um `.env` rapidamente (PowerShell)**:
+  ```powershell
+  @"
+  AZURE_OPENAI_ENDPOINT=https://api-gpt.b3.com.br/internal-api/b3gpt-llms/v1/
+  AZURE_OPENAI_KEY=COLE_SUA_CHAVE_AQUI
+  AZURE_OPENAI_DEPLOYMENT=gpt4o-mini
+  OPENAI_API_VERSION=2024-08-01-preview
+  TEAMS_WEBHOOK_URL=https://contoso.webhook.office.com/webhookb2/...
+  USE_AZURE_OPENAI=true
+  "@ | Out-File -FilePath .env -Encoding UTF8
+  ```
+  Ajuste os valores antes de executar. Para ambientes sem PowerShell, crie o arquivo `.env` manualmente com essas chaves.
 
 ## 9. Integracao Azure OpenAI
 - Defina `use_azure: true` no `config.json` e informe:
