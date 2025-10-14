@@ -117,6 +117,27 @@ class GPTCore:
         except Exception as exc:
             raise GPTServiceUnavailable("Nao foi possivel validar credenciais ou modelo. Verifique chave, endpoint e deployment configurados.") from exc
 
+    def _extract_content_text(self, response) -> str:
+        try:
+            message = response.choices[0].message  # type: ignore[index]
+        except (AttributeError, IndexError, KeyError):
+            return ""
+        content = getattr(message, "content", "")
+        if isinstance(content, str):
+            return content.strip()
+        if isinstance(content, list):
+            fragments = []
+            for part in content:
+                if isinstance(part, dict):
+                    if part.get("type") == "text":
+                        fragments.append(str(part.get("text", "")))
+                else:
+                    text_value = getattr(part, "text", None)
+                    if text_value:
+                        fragments.append(str(text_value))
+            return "\n".join(fragment.strip() for fragment in fragments if fragment).strip()
+        return str(content).strip() if content else ""
+
 
     def analyze_document(self, text: str, metadata: Dict) -> Dict:
         """Run the full three-stage GPT analysis pipeline."""
@@ -414,12 +435,18 @@ class GPTCore:
     def _parse_response(self, response, fallback: Optional[Dict] = None) -> Dict:
         if not response:
             return fallback or {}
+        content = ""
         try:
-            content = response.choices[0].message.content
+            content = self._extract_content_text(response)
+            if not content:
+                raise ValueError("conteudo vazio")
             data = json.loads(content)
             return data
         except (KeyError, AttributeError, json.JSONDecodeError) as exc:
-            logging.error("Failed to parse GPT response. Error: %s", exc)
+            logging.error("Failed to parse GPT response. Error: %s | raw=%r", exc, content)
+            return fallback or {}
+        except ValueError as exc:
+            logging.error("Failed to parse GPT response. Error: %s | raw=%r", exc, content)
             return fallback or {}
 
     def _parse_optional_response(self, response) -> Dict:
@@ -650,9 +677,10 @@ class GPTCore:
         payload: Dict = {"model": target_model, "messages": messages}
         temperature = self.config.get("temperature", 0.2)
         if target_model and str(target_model).startswith("gpt-5"):
-            temperature = None
+            # Alguns deployments Azure exigem campo numerico; quando omitido retorna 422.
+            temperature = 0.0 if self.azure_enabled else None
         if temperature is not None:
-            payload["temperature"] = temperature
+            payload["temperature"] = float(temperature)
         timeout = self.config.get("request_timeout")
         try:
             if timeout:
