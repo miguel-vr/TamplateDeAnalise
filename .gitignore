@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+logs/
+folders/entrada/
+folders/em_processamento/
+folders/feedback/
+folders/processados/
+_tmp_*.py
+*.zip

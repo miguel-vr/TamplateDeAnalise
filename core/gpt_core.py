@@ -1,4 +1,5 @@
 import difflib
+import os
 import unicodedata
 import json
 import logging
@@ -35,46 +36,49 @@ class GPTCore:
         self.knowledge_base = knowledge_base
         self._client = None
         self.offline_mode = False
-        if not config.get("api_key") or OpenAI is None:
-            self.offline_mode = True
-            logging.warning(
-                "GPTCore running in offline mode. Provide a valid API key and install the openai package to enable GPT analysis."
-            )
-
-    def __init__(self, config: Dict, knowledge_base: KnowledgeBase):
-        self.config = config
-        self.knowledge_base = knowledge_base
-        self._client = None
-        self.offline_mode = False
-        self.azure_enabled = bool(config.get("use_azure") or config.get("azure_endpoint"))
-        self.azure_endpoint = (config.get("azure_endpoint") or "").rstrip("/")
-        self.azure_api_key = config.get("azure_api_key") or config.get("api_key")
-        self.azure_deployment = config.get("azure_deployment")
-        self.azure_api_version = config.get("azure_api_version") or "2024-02-01"
+        self.azure_endpoint = (
+            config.get("azure_endpoint")
+            or os.getenv("AZURE_OPENAI_ENDPOINT")
+            or os.getenv("URL_BASE")
+            or ""
+        ).rstrip("/")
+        self.azure_api_key = (
+            config.get("azure_api_key")
+            or os.getenv("AZURE_OPENAI_KEY")
+            or os.getenv("API_KEY")
+            or ""
+        )
+        self.azure_deployment = (
+            config.get("azure_deployment")
+            or os.getenv("AZURE_OPENAI_DEPLOYMENT")
+            or os.getenv("DEPLOYMENT_NAME")
+            or ""
+        )
+        self.azure_api_version = (
+            config.get("azure_api_version")
+            or os.getenv("AZURE_OPENAI_API_VERSION")
+            or os.getenv("OPENAI_API_VERSION")
+            or "2024-02-01"
+        )
+        self.azure_enabled = bool(
+            config.get("use_azure")
+            or os.getenv("USE_AZURE_OPENAI")
+            or self.azure_endpoint
+        )
 
         if self.azure_enabled:
             if AzureOpenAI is None:
-                logging.error(
-                    "AzureOpenAI indisponivel. Instale o pacote 'openai' atualizado para usar Azure OpenAI."
-                )
+                logging.error("AzureOpenAI nao disponivel. Instale o pacote 'openai' (>=1.16).")
                 self.offline_mode = True
             elif not (self.azure_endpoint and self.azure_api_key and self.azure_deployment):
-                logging.error(
-                    "Parametros Azure incompletos (azure_endpoint, azure_api_key, azure_deployment)."
-                )
+                logging.error("Parametros Azure incompletos. Informe endpoint, api_key e deployment.")
                 self.offline_mode = True
             else:
-                logging.info(
-                    "GPTCore configurado para Azure OpenAI (endpoint=%s, deployment=%s).",
-                    self.azure_endpoint,
-                    self.azure_deployment,
-                )
-        else:
+                logging.info("GPTCore configurado para Azure OpenAI (endpoint=%s, deployment=%s).", self.azure_endpoint, self.azure_deployment)
+        if not self.azure_enabled:
             if not config.get("api_key") or OpenAI is None:
                 self.offline_mode = True
-                logging.warning(
-                    "GPTCore em modo offline. Forneca OPENAI_API_KEY (ou configure Azure) e instale o pacote 'openai'."
-                )
+                logging.warning("GPTCore em modo offline. Forneca OPENAI_API_KEY (ou configure Azure) e instale o pacote 'openai'.")
 
     def _client_instance(self):
         if self.offline_mode:
@@ -99,7 +103,14 @@ class GPTCore:
             raise GPTServiceUnavailable("Falha ao inicializar cliente OpenAI.")
         try:
             if self.azure_enabled:
-                client.models.list()
+                try:
+                    client.models.list()
+                except Exception as exc:
+                    message = str(exc).lower()
+                    status = getattr(getattr(exc, 'response', None), 'status_code', None)
+                    if status not in {None, 200} and status != 404 and '404' not in message:
+                        raise
+                    logging.debug('Ignorando falha ao listar modelos em Azure (status=%s, msg=%s).', status, message)
             else:
                 model = self.config.get("model")
                 client.models.retrieve(model)

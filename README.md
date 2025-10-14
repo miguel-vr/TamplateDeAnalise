@@ -93,6 +93,7 @@
   - `azure_deployment`: nome do deployment do modelo chat (ex.: `gpt-4o-mini` configurado na empresa).
   - `azure_api_version`: versao da API (padrao `2024-02-01`, ajuste conforme politica interna).
 - Opcionalmente, use as variaveis `USE_AZURE_OPENAI`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_VERSION` e `AZURE_OPENAI_API_KEY` para sobrescrever valores.
+  - Alias suportados: `URL_BASE` (endpoint), `API_KEY` (chave) e `DEPLOYMENT_NAME` (deployment).
 - Quando `use_azure` estiver ativo, `GPTCore` passa a utilizar a classe `AzureOpenAI` do SDK oficial (`openai` >= 1.16) e a chamada `chat.completions.create` com o deployment configurado.
 
 ## 10. Manual operacional (usuarios finais)
@@ -122,3 +123,4 @@
 - **Limpeza de falhas**: revisar periodicamente `folders/em_processamento/_falhas`. Os arquivos permanecem la para revisao manual.
 - **Monitoramento**: utilize `logs/activity.jsonl` para integrar com dashboards (cada linha e um JSON independente). O campo `records` do evento `processing_timeline_summary` lista duracao de todas as etapas.
 - **Extensoes futuras**: para novos tipos de arquivo, adicione a extensao em `SUPPORTED_EXTENSIONS` e implemente o metodo `_read_<ext>()`; para novas notificacoes, estenda `TeamsNotifier` ou crie novos notifiers seguindo a mesma interface (`send_analysis_summary`). 
+- **Configuracao de credenciais**: antes de rodar em producao, defina as variaveis de ambiente (ou um `.env`) com as chaves reais (`AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_KEY`, `AZURE_OPENAI_DEPLOYMENT`, `OPENAI_API_VERSION`, `TEAMS_WEBHOOK_URL`, etc.).

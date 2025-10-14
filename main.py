@@ -15,6 +15,11 @@ from core.taxonomy import TaxonomyRuleEngine
 from core.watcher import FeedbackWatcher, IntakeWatcher, JsonEventLogger
 from core.notifier import TeamsNotifier
 
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency
+    load_dotenv = None  # type: ignore
+
 BASE_DIR = Path(__file__).parent.resolve()
 CONFIG_PATH = BASE_DIR / "config.json"
 DEFAULT_CONFIG = {
@@ -50,6 +55,8 @@ def _env_value(key: str) -> Optional[str]:
 
 
 def load_config() -> Dict:
+    if load_dotenv:
+        load_dotenv()
     if not CONFIG_PATH.exists():
         with open(CONFIG_PATH, "w", encoding="utf-8") as handler:
             json.dump(DEFAULT_CONFIG, handler, indent=2, ensure_ascii=False)
@@ -72,10 +79,10 @@ def load_config() -> Dict:
         "temperature": _env_value("CLASSIFIER_TEMPERATURE"),
         "azure_keyvault_url": _env_value("AZURE_KEYVAULT_URL"),
         "use_azure": _env_value("USE_AZURE_OPENAI"),
-        "azure_endpoint": _env_value("AZURE_OPENAI_ENDPOINT"),
-        "azure_api_key": _env_value("AZURE_OPENAI_API_KEY"),
-        "azure_deployment": _env_value("AZURE_OPENAI_DEPLOYMENT"),
-        "azure_api_version": _env_value("AZURE_OPENAI_API_VERSION"),
+        "azure_endpoint": _env_value("AZURE_OPENAI_ENDPOINT") or _env_value("URL_BASE"),
+        "azure_api_key": _env_value("AZURE_OPENAI_KEY") or _env_value("API_KEY"),
+        "azure_deployment": _env_value("AZURE_OPENAI_DEPLOYMENT") or _env_value("DEPLOYMENT_NAME"),
+        "azure_api_version": _env_value("AZURE_OPENAI_API_VERSION") or _env_value("OPENAI_API_VERSION"),
         "teams_webhook_url": _env_value("TEAMS_WEBHOOK_URL"),
     }
 
