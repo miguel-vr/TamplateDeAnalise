@@ -1,22 +1,75 @@
 import json
 import logging
 import urllib.request
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence, Tuple
 
 
 class TeamsNotifier:
     """Send Adaptive Card summaries to Microsoft Teams via incoming webhook."""
 
-    def __init__(self, webhook_url: str) -> None:
-        self.webhook_url = (webhook_url or "").strip()
+    def __init__(self, analysis_webhook_url: str, activity_webhook_url: Optional[str] = None) -> None:
+        self.analysis_webhook_url = (analysis_webhook_url or "").strip()
+        self.activity_webhook_url = (activity_webhook_url or "").strip()
 
-    def enabled(self) -> bool:
-        return bool(self.webhook_url)
+    def analysis_enabled(self) -> bool:
+        return bool(self.analysis_webhook_url)
+
+    def activity_enabled(self) -> bool:
+        return bool(self.activity_webhook_url)
 
     def send_analysis_summary(self, payload: Dict) -> None:
-        if not self.enabled():
+        if not self.analysis_enabled():
             return
         card = self._build_card(payload)
+        self._post_card(self.analysis_webhook_url, card, payload.get("file_name"))
+
+    def send_activity_event(
+        self,
+        title: str,
+        message: str,
+        facts: Optional[Sequence[Tuple[str, str]]] = None,
+        link: Optional[str] = None,
+        event_type: str = "",
+    ) -> None:
+        if not self.activity_enabled():
+            return
+        fact_items = []
+        for item in facts or []:
+            if not item:
+                continue
+            key, value = item
+            fact_items.append({"title": str(key), "value": str(value)})
+        card_body: List[Dict] = [
+            {"type": "TextBlock", "text": title, "weight": "Bolder", "size": "Medium"},
+            {"type": "TextBlock", "text": message, "wrap": True, "spacing": "Small"},
+        ]
+        if fact_items:
+            card_body.append({"type": "FactSet", "facts": fact_items})
+        if event_type:
+            card_body.append(
+                {
+                    "type": "TextBlock",
+                    "text": f"Evento: `{event_type}`",
+                    "isSubtle": True,
+                    "spacing": "Small",
+                }
+            )
+        card: Dict = {
+            "type": "AdaptiveCard",
+            "version": "1.4",
+            "body": card_body,
+        }
+        if link:
+            card["actions"] = [
+                {
+                    "type": "Action.OpenUrl",
+                    "title": "Abrir recurso",
+                    "url": link if link.startswith("http") else f"file:///{link.replace('\\', '/')}",
+                }
+            ]
+        self._post_card(self.activity_webhook_url, card, title)
+
+    def _post_card(self, webhook_url: str, card: Dict, context: Optional[str]) -> None:
         envelope = {
             "type": "message",
             "attachments": [
@@ -28,23 +81,26 @@ class TeamsNotifier:
         }
         data = json.dumps(envelope).encode("utf-8")
         request = urllib.request.Request(
-            self.webhook_url,
+            webhook_url,
             data=data,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
+        logging.debug("Enviando Adaptive Card (%s) para Teams", context or "evento")
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
                 if response.status >= 300:
                     logging.error(
-                        "Adaptive Card webhook retornou status %s ao enviar resumo para %s",
+                        "Adaptive Card webhook retornou status %s ao enviar card (%s)",
                         response.status,
-                        payload.get("file_name"),
+                        context or "evento",
                     )
+                else:
+                    logging.debug("Adaptive Card entregue com sucesso (%s)", context or "evento")
         except Exception as exc:
             logging.exception(
-                "Falha ao enviar Adaptive Card para arquivo %s: %s",
-                payload.get("file_name"),
+                "Falha ao enviar Adaptive Card (%s): %s",
+                context or "evento",
                 exc,
             )
 

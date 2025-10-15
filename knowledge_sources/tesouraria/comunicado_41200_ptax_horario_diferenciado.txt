@@ -1,0 +1,36 @@
+﻿Comunicado n° 41.200 de 31/1/2024
+COMUNICADO N° 41.200, DE 31 DE JANEIRO DE 2024
+Comunicamos os procedimentos a serem observados nas operações de câmbio e respectivos registros e na apuração da taxa de câmbio real/dólar (PTAX) divulgada pelo Banco Central do Brasil nos dias com horário diferenciado de funcionamento no ano de 2024, que são os dias 14 de fevereiro (quarta-feira de cinzas), 24 e 31 de dezembro.
+2. A apuração dos boletins de câmbio (PTAX), no dia 14 de fevereiro de 2024, será realizada de acordo com os seguintes procedimentos:
+I - serão realizadas duas consultas para apuração da taxa de câmbio real/dólar PTAX, com duração de dois minutos cada, e respectivos horários de início escolhidos aleatoriamente dentro dos seguintes intervalos:
+a) 14h30 às 14h40, para a primeira consulta; e
+b) 15h30 às 15h40, para a segunda consulta.
+II - o boletim de fechamento PTAX será divulgado simultaneamente ao boletim de 15h30 e suas taxas de compra e de venda corresponderão, respectivamente, às médias aritméticas das taxas de compra e das taxas de venda apuradas nas duas consultas do dia;
+III - as taxas das demais moedas divulgadas no boletim de fechamento PTAX serão calculadas a partir das taxas capturadas às 15h30.
+3. A apuração dos boletins de câmbio (PTAX), no dia 24 de dezembro de 2024, será realizada de acordo com os seguintes procedimentos:
+I - serão realizadas duas consultas para apuração da taxa de câmbio real/dólar PTAX, com duração de dois minutos cada, e respectivos horários de início escolhidos aleatoriamente dentro dos seguintes intervalos:
+a) 10h00 às 10h10, para a primeira consulta; e
+b) 11h00 às 11h10, para a segunda consulta;
+II – o boletim de fechamento PTAX será divulgado simultaneamente ao boletim de 11h00 e suas taxas de compra e de venda corresponderão, respectivamente, às médias aritméticas das taxas de compra e das taxas de venda apuradas nas duas consultas do dia;
+III - as taxas das demais moedas divulgadas no boletim de fechamento PTAX serão calculadas a partir das taxas capturadas às 11h00.
+4. A apuração dos boletins de câmbio (PTAX), no dia 31 de dezembro de 2024, será realizada de acordo com os seguintes procedimentos:
+I - serão divulgados o boletim de câmbio de 10h00 e o boletim de fechamento PTAX;
+II - não haverá consultas para a apuração das taxas de câmbio real/dólar. As taxas de câmbio real/dólar do boletim de 10h00 e do boletim de fechamento PTAX serão as mesmas divulgadas no boletim de fechamento PTAX do dia 30 de dezembro de 2024;
+III - o boletim de fechamento PTAX será divulgado simultaneamente ao boletim de 10h00;
+IV - as taxas das demais moedas divulgadas no boletim de fechamento PTAX serão calculadas a partir das taxas capturadas às 10h00.
+5. Nos dias 24 e 31 de dezembro de 2024, a grade de horário de que trata o art. 78 da Resolução BCB nº 277, de 31 de dezembro de 2022, será de exceção para os registros dos eventos de câmbio nos mercados primário e interbancário, com abertura às 7h00 e fechamento às 12h00.
+6. Nos dias 24 e 31 de dezembro de 2024, os registros dos eventos de câmbio no mercado interbancário deverão ser efetuados até 11h30 e as respectivas confirmações até 12h00.
+7. Nos dias 24 e 31 de dezembro de 2024, a confirmação dos registros dos eventos de câmbio no mercado interbancário, no caso de operações realizadas por intermédio de câmara ou prestador de serviços de compensação e de liquidação, sem uso de sistemas de negociação e sem identificação da contraparte deverá ocorrer até 11h45.
+8. No dia 31 de dezembro de 2024 somente poderão ser realizadas operações de câmbio no mercado interbancário ou registro de eventos no Sistema Câmbio que não alterem quantitativamente a posição de câmbio.
+9. As agências de turismo autorizadas a operar em câmbio pelo Banco Central do Brasil devem seguir as disposições específicas para o registro dessas operações conforme art. 83 da Resolução nº 277, de 31 de dezembro de 2022.
+10. Todos os dias com horário diferenciado de funcionamento são considerados dias úteis para fins de contagem de prazo para liquidação das operações de câmbio.
+11. Os horários indicados neste Comunicado referem-se à Hora Oficial de Brasília.
+Departamento das Reservas Internacionais (Depin)
+Alan da Silva Andrade Mendes
+Chefe
+Departamento de Monitoramento do Sistema Financeiro (Desig)
+Gilneu Francisco Astolfi Vivan
+Chefe
+Departamento de Tecnologia da Informação (Deinf)
+Haroldo Jayme Martins Froes Cruz
+Chefe

@@ -33,7 +33,17 @@ DEFAULT_CONFIG = {
     "log_file": "logs/activity.jsonl",
     "text_log_file": "logs/system.log",
     "knowledge_base_path": "knowledge.json",
-    "max_retries": 2,
+    "category_knowledge_root": "knowledge_sources",
+    "max_retries": 3,
+    "teams_activity_webhook_url": "",
+    "storage_root": "folders",
+    "input_subdir": "entrada",
+    "processing_subdir": "em_processamento",
+    "processing_fail_subdir": "_falhas",
+    "processed_subdir": "processados",
+    "feedback_subdir": "feedback",
+    "feedback_processed_subdir": "processado",
+    "complex_samples_subdir": "complex_samples",
     "cross_validation_model": "gpt-5",
     "temperature": 1.0,
     "request_timeout": 60,
@@ -84,6 +94,15 @@ def load_config() -> Dict:
         "azure_deployment": _env_value("AZURE_OPENAI_DEPLOYMENT") or _env_value("DEPLOYMENT_NAME"),
         "azure_api_version": _env_value("AZURE_OPENAI_API_VERSION") or _env_value("OPENAI_API_VERSION"),
         "teams_webhook_url": _env_value("TEAMS_WEBHOOK_URL"),
+        "teams_activity_webhook_url": _env_value("TEAMS_ACTIVITY_WEBHOOK_URL"),
+        "storage_root": _env_value("CLASSIFIER_STORAGE_ROOT"),
+        "input_subdir": _env_value("CLASSIFIER_INPUT_SUBDIR"),
+        "processing_subdir": _env_value("CLASSIFIER_PROCESSING_SUBDIR"),
+        "processing_fail_subdir": _env_value("CLASSIFIER_PROCESSING_FAIL_SUBDIR"),
+        "processed_subdir": _env_value("CLASSIFIER_PROCESSED_SUBDIR"),
+        "feedback_subdir": _env_value("CLASSIFIER_FEEDBACK_SUBDIR"),
+        "feedback_processed_subdir": _env_value("CLASSIFIER_FEEDBACK_PROCESSED_SUBDIR"),
+        "complex_samples_subdir": _env_value("CLASSIFIER_COMPLEX_SAMPLES_SUBDIR"),
     }
 
     for key, value in env_overrides.items():
@@ -114,9 +133,16 @@ def load_config() -> Dict:
     return merged
 
 
+def _resolve_path(value: str) -> Path:
+    candidate = Path(value)
+    if candidate.is_absolute():
+        return candidate
+    return BASE_DIR / candidate
+
+
 def setup_logging(config: Dict) -> None:
     log_level = getattr(logging, config.get("log_level", "INFO").upper(), logging.INFO)
-    text_log_path = BASE_DIR / config.get("text_log_file", "logs/system.log")
+    text_log_path = _resolve_path(config.get("text_log_file", "logs/system.log"))
     text_log_path.parent.mkdir(parents=True, exist_ok=True)
 
     handlers = [logging.StreamHandler(sys.stdout)]
@@ -132,24 +158,61 @@ def setup_logging(config: Dict) -> None:
     logging.info("Logging configurado. Saida principal em %s", text_log_path)
 
 
-def ensure_structure() -> None:
-    folders = [
-        BASE_DIR / "core",
-        BASE_DIR / "folders",
-        BASE_DIR / "folders" / "entrada",
-        BASE_DIR / "folders" / "em_processamento",
-        BASE_DIR / "folders" / "em_processamento" / "_falhas",
-        BASE_DIR / "folders" / "processados",
-        BASE_DIR / "folders" / "processados" / "tecnologia",
-        BASE_DIR / "folders" / "processados" / "juridico",
-        BASE_DIR / "folders" / "processados" / "financeiro",
-        BASE_DIR / "folders" / "processados" / "compliance",
-        BASE_DIR / "folders" / "processados" / "outros",
-        BASE_DIR / "folders" / "feedback",
-        BASE_DIR / "folders" / "feedback" / "processado",
+def resolve_storage_paths(config: Dict) -> Dict[str, Path]:
+    storage_root = _resolve_path(config.get("storage_root", "folders"))
+
+    def _resolve_relative(value: Optional[str], default: str) -> Path:
+        raw = value if value not in {None, ""} else default
+        candidate = Path(raw)
+        if candidate.is_absolute():
+            return candidate
+        return storage_root / candidate
+
+    input_dir = _resolve_relative(config.get("input_subdir"), "entrada")
+    processing_dir = _resolve_relative(config.get("processing_subdir"), "em_processamento")
+
+    processing_fail_raw = config.get("processing_fail_subdir", "_falhas")
+    processing_fail_dir = Path(processing_fail_raw)
+    if not processing_fail_dir.is_absolute():
+        processing_fail_dir = processing_dir / processing_fail_raw
+
+    processed_dir = _resolve_relative(config.get("processed_subdir"), "processados")
+    feedback_dir = _resolve_relative(config.get("feedback_subdir"), "feedback")
+    feedback_processed_raw = config.get("feedback_processed_subdir", "processado")
+    feedback_processed_dir = Path(feedback_processed_raw)
+    if not feedback_processed_dir.is_absolute():
+        feedback_processed_dir = feedback_dir / feedback_processed_raw
+
+    complex_samples_dir = _resolve_relative(config.get("complex_samples_subdir"), "complex_samples")
+
+    return {
+        "storage_root": storage_root,
+        "input_dir": input_dir,
+        "processing_dir": processing_dir,
+        "processing_fail_dir": processing_fail_dir,
+        "processed_dir": processed_dir,
+        "feedback_dir": feedback_dir,
+        "feedback_processed_dir": feedback_processed_dir,
+        "complex_samples_dir": complex_samples_dir,
+    }
+
+
+def ensure_structure(paths: Dict[str, Path]) -> None:
+    base_directories = [
+        paths["storage_root"],
+        paths["input_dir"],
+        paths["processing_dir"],
+        paths["processing_fail_dir"],
+        paths["processed_dir"],
+        paths["feedback_dir"],
+        paths["feedback_processed_dir"],
+        paths["complex_samples_dir"],
         BASE_DIR / "logs",
     ]
-    for directory in folders:
+    default_categories = ["tecnologia", "juridico", "financeiro", "compliance", "outros"]
+    for category in default_categories:
+        base_directories.append(paths["processed_dir"] / category)
+    for directory in base_directories:
         if directory.exists():
             logging.debug("Pasta ja existia: %s", directory)
         else:
@@ -158,17 +221,26 @@ def ensure_structure() -> None:
 
 
 def create_components(config: Dict):
-    ensure_structure()
-    knowledge_path = BASE_DIR / config.get("knowledge_base_path", "knowledge.json")
-    log_file = BASE_DIR / config.get("log_file", "logs/activity.jsonl")
+    storage_paths = resolve_storage_paths(config)
+    ensure_structure(storage_paths)
+    knowledge_path = _resolve_path(config.get("knowledge_base_path", "knowledge.json"))
+    category_root_cfg = config.get("category_knowledge_root", "knowledge_sources")
+    category_root_path = Path(category_root_cfg)
+    if not category_root_path.is_absolute():
+        category_root_path = (BASE_DIR / category_root_path).resolve()
+    category_root_path.mkdir(parents=True, exist_ok=True)
+    log_file = _resolve_path(config.get("log_file", "logs/activity.jsonl"))
     event_logger = JsonEventLogger(log_file)
-    knowledge_base = KnowledgeBase(str(knowledge_path))
+    knowledge_base = KnowledgeBase(str(knowledge_path), str(category_root_path))
 
     gpt_core = GPTCore(config, knowledge_base)
     gpt_core.ensure_available()
     validator = Validator(config, gpt_core)
     taxonomy_engine = TaxonomyRuleEngine()
-    teams_notifier = TeamsNotifier(config.get("teams_webhook_url", ""))
+    teams_notifier = TeamsNotifier(
+        config.get("teams_webhook_url", ""),
+        config.get("teams_activity_webhook_url", ""),
+    )
     processor = DocumentProcessor(
         gpt_core=gpt_core,
         validator=validator,
@@ -177,19 +249,20 @@ def create_components(config: Dict):
         event_emitter=event_logger.emit,
         taxonomy_engine=taxonomy_engine,
         teams_notifier=teams_notifier,
+        storage_paths=storage_paths,
     )
 
     intake_watcher = IntakeWatcher(
-        entrada_dir=BASE_DIR / "folders" / "entrada",
-        processamento_dir=BASE_DIR / "folders" / "em_processamento",
+        entrada_dir=storage_paths["input_dir"],
+        processamento_dir=storage_paths["processing_dir"],
         processor=processor,
         interval=int(config.get("polling_interval", 10)),
         logger=event_logger,
         max_workers=int(config.get("processing_workers", 2)),
     )
     feedback_watcher = FeedbackWatcher(
-        feedback_dir=BASE_DIR / "folders" / "feedback",
-        processed_feedback_dir=BASE_DIR / "folders" / "feedback" / "processado",
+        feedback_dir=storage_paths["feedback_dir"],
+        processed_feedback_dir=storage_paths["feedback_processed_dir"],
         knowledge_base=knowledge_base,
         interval=int(config.get("feedback_polling_interval", 15)),
         logger=event_logger,

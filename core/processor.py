@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 import tempfile
+import textwrap
 import time
 import uuid
 import zipfile
@@ -193,12 +194,21 @@ class DocumentProcessor:
         event_emitter: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         taxonomy_engine: Optional[TaxonomyRuleEngine] = None,
         teams_notifier: Optional["TeamsNotifier"] = None,
+        storage_paths: Optional[Dict[str, Path]] = None,
     ):
         self.gpt_core = gpt_core
         self.validator = validator
         self.knowledge_base = knowledge_base
         self.base_folder = Path(base_folder)
-        self.processed_folder = self.base_folder / "folders" / "processados"
+        self.paths: Dict[str, Path] = {key: Path(value) for key, value in (storage_paths or {}).items()}
+        self.storage_root = self.paths.get("storage_root", self.base_folder / "folders")
+        self.input_folder = self.paths.get("input_dir", self.storage_root / "entrada")
+        self.processing_folder = self.paths.get("processing_dir", self.storage_root / "em_processamento")
+        self.processing_fail_folder = self.paths.get("processing_fail_dir", self.processing_folder / "_falhas")
+        self.processed_folder = self.paths.get("processed_dir", self.storage_root / "processados")
+        self.feedback_processed_dir = self.paths.get(
+            "feedback_processed_dir", self.storage_root / "feedback" / "processado"
+        )
         self._event_emitter = event_emitter
         self.taxonomy_engine = taxonomy_engine
         self.teams_notifier = teams_notifier
@@ -237,6 +247,19 @@ class DocumentProcessor:
             timeline.finish(False, {"reason": "unsupported_extension"})
             return None
 
+        if self.teams_notifier:
+            self.teams_notifier.send_activity_event(
+                title="Processamento iniciado",
+                message=f"{path.name} entrou em processamento.",
+                facts=[
+                    ("Processo", proc_id),
+                    ("Arquivo", path.name),
+                    ("Extensao", suffix or "n/a"),
+                    ("Tamanho", f"{size_bytes} bytes"),
+                ],
+                event_type="processing_started",
+            )
+
         try:
             timeline.stage_start("extracao_texto", {"extensao": suffix})
             try:
@@ -265,7 +288,7 @@ class DocumentProcessor:
             except GPTServiceUnavailable as exc:
                 timeline.stage_error("analise_gpt", exc)
                 logging.error("[%s] Falha ao acessar o GPT para %s: %s", proc_id, path.name, exc)
-                self._handle_gpt_failure(path)
+                self._handle_gpt_failure(path, proc_id)
                 timeline.finish(False, {"reason": "gpt_indisponivel", "error": str(exc)})
                 return None
             except Exception as exc:
@@ -487,6 +510,21 @@ class DocumentProcessor:
                         path.name,
                         exc,
                     )
+                try:
+                    self.teams_notifier.send_activity_event(
+                        title="Processamento concluido",
+                        message=f"{path.name} foi processado com sucesso.",
+                        facts=[
+                            ("Processo", proc_id),
+                            ("Categoria", entry.category),
+                            ("Confianca", f"{validated_result.get('confidence', 0.0) * 100:.2f}%"),
+                            ("Artefato", str(zip_path)),
+                        ],
+                        link=str(zip_path),
+                        event_type="processing_completed",
+                    )
+                except Exception as exc:
+                    logging.debug("[%s] Falha ao enviar notificacao de atividade: %s", proc_id, exc)
 
             try:
                 path.unlink()
@@ -585,8 +623,8 @@ class DocumentProcessor:
             logging.info("Pacote %s movido para %s", zip_name, destination_zip)
             return destination_zip
 
-    def _handle_gpt_failure(self, processing_path: Path) -> None:
-        entrada_path = self.base_folder / "folders" / "entrada" / processing_path.name
+    def _handle_gpt_failure(self, processing_path: Path, proc_id: str) -> None:
+        entrada_path = self.input_folder / processing_path.name
         logging.error(
             "GPT indisponivel. Devolvendo %s para a pasta de entrada (%s) e abortando processamento.",
             processing_path.name,
@@ -599,6 +637,16 @@ class DocumentProcessor:
                 "Falha ao devolver arquivo %s para pasta de entrada: %s",
                 processing_path,
                 exc,
+            )
+        if self.teams_notifier:
+            self.teams_notifier.send_activity_event(
+                title="Processamento interrompido",
+                message=f"{processing_path.name} foi devolvido para a entrada devido a indisponibilidade do GPT.",
+                facts=[
+                    ("Processo", proc_id),
+                    ("Destino", str(entrada_path)),
+                ],
+                event_type="processing_aborted",
             )
 
     def _handle_unexpected_failure(
@@ -619,7 +667,7 @@ class DocumentProcessor:
             },
         )
         if processing_path.exists():
-            failure_dir = self.base_folder / "folders" / "em_processamento" / "_falhas"
+            failure_dir = self.processing_fail_folder
             failure_dir.mkdir(parents=True, exist_ok=True)
             destination = failure_dir / processing_path.name
             try:
@@ -637,66 +685,159 @@ class DocumentProcessor:
                     processing_path,
                     move_err,
                 )
+            if self.teams_notifier:
+                self.teams_notifier.send_activity_event(
+                    title="Processamento falhou",
+                    message=f"{processing_path.name} falhou durante o pipeline e foi movido para a pasta de falhas.",
+                    facts=[
+                        ("Processo", proc_id),
+                        ("Destino", str(destination)),
+                        ("Erro", str(error)),
+                    ],
+                    event_type="processing_failed",
+                )
+
 
     def _write_analysis_file(self, target: Path, source_path: Path, text: str, result: Dict) -> None:
-        confidence_percent = round(result.get("confidence", 0.0) * 100, 2)
+        confidence_ratio = result.get("confidence", 0.0)
+        confidence_percent = result.get("confidence_percent", round(confidence_ratio * 100, 2))
+        validation_attempts = result.get("validation_attempts", 0)
+        secondary_areas = result.get("areas_secundarias") or []
+
         lines = [
             f"Documento: {source_path.name}",
-            f"Categoria principal: {result.get('categoria', 'Não identificada')}",
-            f"Tema: {result.get('tema', 'Tema não identificado')}",
-            f"Áreas secundárias: {', '.join(result.get('areas_secundarias', []) or ['Nenhuma'])}",
-            f"Confiança: {confidence_percent:.2f}%",
+            f"Categoria principal: {result.get('categoria', 'Nao identificada')}",
+            f"Tema: {result.get('tema', 'Tema nao identificado')}",
+            f"Areas secundarias: {', '.join(secondary_areas) if secondary_areas else 'Nenhuma'}",
+            f"Confianca final: {confidence_percent:.2f}% (tentativas de validacao: {validation_attempts})",
             "",
-            "Justificativa:",
-            result.get("justificativa", "Não informado."),
-            "",
-            "Motivos chave:",
+            "Justificativa consolidada:",
+            result.get("justificativa", "Nao informado."),
         ]
-        motivos = result.get("motivos_chave") or ["Não informados."]
-        lines.extend(f"- {motivo}" for motivo in motivos)
+
+        motivos = result.get("motivos_chave") or []
+        if motivos:
+            lines.append("")
+            lines.append("Motivos chave:")
+            for motivo in motivos:
+                lines.append(f"- {motivo}")
 
         cross = result.get("cross_validation", {})
         lines.append("")
-        lines.append("Cross-validation:")
-        lines.append(f"  Acordo: {cross.get('agreement', 'Não informado')}")
-        lines.append(f"  Ajuste de confiança: {cross.get('confidence_adjustment', 0)}")
+        lines.append("Camada de auditoria (cross-validation):")
+        lines.append(f"  Acordo: {cross.get('agreement', 'Nao informado')}")
+        lines.append(f"  Ajuste de confianca: {cross.get('confidence_adjustment', 0)}")
         risks = cross.get("risks") or []
         if risks:
-            lines.append("  Riscos:")
-            lines.extend(f"    - {risk}" for risk in risks)
+            lines.append("  Riscos apontados:")
+            for risk in risks:
+                lines.append(f"    - {risk}")
         notes = cross.get("notes")
         if notes:
             lines.append(f"  Notas: {notes}")
 
         i3 = result.get("i3_explanation", {})
         lines.append("")
-        lines.append("Camada I3 (Insight, Impacto, Inferência):")
-        lines.append(f"  Insight: {i3.get('insight', 'Não informado')}")
-        lines.append(f"  Impacto: {i3.get('impacto', 'Não informado')}")
-        lines.append(f"  Inferência: {i3.get('inferencia', 'Não informado')}")
-        lines.append(f"  Motivação da confiabilidade: {result.get('confidence_reason', 'Não informado')}")
+        lines.append("Camada I3 (Insight, Impacto, Inferencia):")
+        lines.append(f"  Insight: {i3.get('insight', 'Nao informado')}")
+        lines.append(f"  Impacto: {i3.get('impacto', 'Nao informado')}")
+        lines.append(f"  Inferencia: {i3.get('inferencia', 'Nao informado')}")
+        lines.append(f"  Motivacao da confiabilidade: {result.get('confidence_reason', 'Nao informado')}")
 
         knowledge_matches = result.get("knowledge_matches") or []
         if knowledge_matches:
             lines.append("")
-            lines.append("Validação por conhecimento local:")
+            lines.append("Camada de conhecimento (entradas estruturadas):")
             for match in knowledge_matches:
                 lines.append(
-                    f"  - Categoria {match.get('category')} | match={match.get('best_match', 0):.2f} | média={match.get('average_match', 0):.2f}"
+                    f"  - Categoria {match.get('category')} | melhor={match.get('best_match', 0):.2f} | media={match.get('average_match', 0):.2f}"
                 )
+        best_structured = 0.0
+        if knowledge_matches:
+            best_structured = max(match.get("best_match", 0.0) for match in knowledge_matches)
+            if best_structured < 0.2:
+                lines.append("  *Aviso*: similaridade baixa com o histórico estruturado; considere revisar knowledge.json.")
+
+        document_matches = result.get("document_knowledge_matches") or []
+        if document_matches:
+            lines.append("")
+            lines.append("Camada documental (arquivos reais por categoria):")
+            for match in document_matches:
+                terms = ", ".join((match.get("top_terms") or [])[:6])
+                lines.append(
+                    f"  - Categoria {match.get('category')} | score={match.get('score', 0):.2f} | documentos={match.get('document_count', 0)} | termos={terms}"
+                )
+        strong_matches = result.get("strong_category_suggestions") or []
+        if strong_matches:
+            lines.append("")
+            lines.append("Categorias fortes sugeridas (>=80% de similaridade):")
+            for category_name, score in strong_matches:
+                lines.append(f"  - {category_name} ({score*100:.2f}%)")
 
         validation_layers = result.get("validation_layers", {})
         profile = validation_layers.get("category_profile") or {}
         keywords = profile.get("top_keywords") or []
         if keywords:
             lines.append("")
-            lines.append("Palavras-chave históricas da categoria selecionada:")
+            lines.append("Palavras-chave historicas (base estruturada):")
             lines.append(f"  {', '.join(keywords[:10])}")
+
+        document_profile = validation_layers.get("category_document_profile") or {}
+        if document_profile:
+            lines.append("")
+            lines.append("Perfil documental da categoria:")
+            terms = ", ".join((document_profile.get("top_terms") or [])[:10])
+            if terms:
+                lines.append(f"  Termos recorrentes: {terms}")
+            recent_docs = document_profile.get("recent_documents") or []
+            if recent_docs:
+                lines.append(f"  Exemplos recentes: {', '.join(recent_docs[:5])}")
+            if document_profile.get("last_scan"):
+                lines.append(f"  Ultima atualizacao: {document_profile.get('last_scan')}")
+            doc_total = document_profile.get("document_count", 0)
+            if doc_total:
+                lines.append(f"  Total de documentos reais: {doc_total}")
+            else:
+                lines.append("  Nenhum documento real cadastrado. Adicione exemplos em knowledge_sources/<categoria>.")
+
+        feedback_profile = validation_layers.get("category_feedback_profile") or {}
+        if feedback_profile:
+            lines.append("")
+            lines.append("Resumo de feedback humano da categoria:")
+            lines.append(
+                "  +{pos}/-{neg} | aprovacao={ratio:.2f} | reprocessos={rep} | rejeicoes conhecimento={rej}".format(
+                    pos=feedback_profile.get("positive", 0),
+                    neg=feedback_profile.get("negative", 0),
+                    ratio=feedback_profile.get("approval_ratio", 0.0),
+                    rep=feedback_profile.get("reprocess_requests", 0),
+                    rej=feedback_profile.get("knowledge_rejections", 0),
+                )
+            )
+            promoted = ", ".join(kw for kw, _ in feedback_profile.get("keywords_promoted", [])[:6])
+            flagged = ", ".join(kw for kw, _ in feedback_profile.get("keywords_flagged", [])[:6])
+            if promoted:
+                lines.append(f"  Palavras reforcadas: {promoted}")
+            if flagged:
+                lines.append(f"  Palavras sinalizadas: {flagged}")
+
+        feedback_adjustments = result.get("feedback_adjustment_details", {})
+        primary_feedback_detail = feedback_adjustments.get("primary")
+        if primary_feedback_detail:
+            lines.append("")
+            lines.append("Ajustes quantitativos de feedback:")
+            lines.append(
+                "  Ajuste primario: {adj:+.2f} (aprovacao={ratio}, reprocessos={req}, rejeicoes={rej})".format(
+                    adj=primary_feedback_detail.get("adjustment", 0.0),
+                    ratio=primary_feedback_detail.get("approval_ratio"),
+                    req=primary_feedback_detail.get("reprocess_requests"),
+                    rej=primary_feedback_detail.get("knowledge_rejections"),
+                )
+            )
 
         similar_docs = validation_layers.get("similar_documents") or []
         if similar_docs:
             lines.append("")
-            lines.append("Documentos similares utilizados na decisão:")
+            lines.append("Documentos similares consultados na base estruturada:")
             for item in similar_docs:
                 lines.append(
                     f"  - {item.get('file_name')} | categoria: {item.get('category')} | similaridade: {item.get('score', 0):.2f}"
@@ -728,25 +869,219 @@ class DocumentProcessor:
         with open(target, "w", encoding="utf-8") as handler:
             handler.write("\n".join(lines))
 
+
     def _write_feedback_file(self, target: Path, source_path: Path, result: Dict) -> None:
-        template = [
-            f"documento: {source_path.name}",
-            f"status: correto",
-            f"categoria_atribuida: {result.get('categoria', 'Nao identificada')}",
-            f"tema: {result.get('tema', 'Tema nao identificado')}",
-            f"confianca_estimativa: {round(result.get('confidence', 0.0) * 100, 2):.2f}%",
-            "nova_categoria:",
-            "observacoes:",
-            "",
-            "# Opcional: use os marcadores abaixo se preferir apenas marcar com X",
-            "[ ] Correto",
-            "[ ] Incorreto",
-            "Categoria correta (se marcou Incorreto):",
-            "Justificativa adicional:",
-            "",
-            "Instrucoes: salve o arquivo e mova para 'folders/feedback/'.",
+        def _slug(value: str) -> str:
+            cleaned = "".join(ch.lower() if ch.isalnum() else "_" for ch in value or "")
+            return "_".join(part for part in cleaned.split("_") if part)
+
+        def _fmt_list(items: List[str]) -> str:
+            return ", ".join(item for item in items if item) if items else "nenhuma"
+
+        def _wrap_comment(text: str, prefix: str = "# ") -> List[str]:
+            wrapped: List[str] = []
+            if not text:
+                return [f"{prefix}-"]
+            for raw_line in text.splitlines():
+                trimmed = raw_line.strip()
+                if not trimmed:
+                    wrapped.append(prefix.strip())
+                    continue
+                for chunk in textwrap.wrap(trimmed, width=110):
+                    wrapped.append(f"{prefix}{chunk}")
+            return wrapped or [f"{prefix}-"]
+
+        primary_category = result.get("categoria", "Nao identificada")
+        primary_slug = _slug(primary_category)
+        confidence_ratio = result.get("confidence", 0.0)
+        confidence_percent = result.get(
+            "confidence_percent", round(confidence_ratio * 100, 2)
+        )
+        validation_attempts = result.get("validation_attempts") or result.get(
+            "tentativas_validacao", 0
+        )
+        secondary_areas = result.get("areas_secundarias") or []
+        theme = result.get("tema", "Tema nao identificado")
+
+        knowledge_matches = result.get("knowledge_matches") or []
+        document_matches = result.get("document_knowledge_matches") or []
+        strong_matches = result.get("strong_category_suggestions") or []
+
+        template: List[str] = [
+            "# Revisao automatica pronta para confirmacao humana.",
+            f"# Documento analisado: {source_path.name}",
+            f"# Categoria principal sugerida: {primary_category}",
+            f"# Tema sugerido: {theme}",
+            f"# Áreas secundarias sugeridas: {_fmt_list(secondary_areas)}",
+            f"# Confianca final: {confidence_percent:.2f}% (tentativas de validacao: {validation_attempts})",
         ]
-        with open(target, 'w', encoding='utf-8') as handler:
+
+        justificativa = result.get("justificativa", "")
+        if justificativa:
+            template.append("# Justificativa do modelo:")
+            template.extend(_wrap_comment(justificativa))
+
+        motivos = result.get("motivos_chave") or []
+        if motivos:
+            template.append("# Motivos chave identificados:")
+            for motivo in motivos:
+                template.extend(_wrap_comment(motivo, prefix="# - "))
+
+        cross = result.get("cross_validation", {})
+        if cross:
+            template.append("# Auditoria (cross-validation):")
+            agreement = cross.get("agreement", "Nao informado")
+            template.append(f"#   Acordo: {agreement}")
+            template.append(f"#   Ajuste de confianca: {cross.get('confidence_adjustment', 0)}")
+            risks = cross.get("risks") or []
+            if risks:
+                template.append("#   Riscos apontados:")
+                for risk in risks:
+                    template.extend(_wrap_comment(risk, prefix="#     - "))
+            notes = cross.get("notes")
+            if notes:
+                template.extend(_wrap_comment(f"Notas: {notes}", prefix="#   "))
+
+        i3 = result.get("i3_explanation", {})
+        insight = i3.get("insight")
+        impacto = i3.get("impacto")
+        inferencia = i3.get("inferencia")
+        if insight or impacto or inferencia:
+            template.append("# Camada I3:")
+            if insight:
+                template.extend(_wrap_comment(f"Insight: {insight}", prefix="#   "))
+            if impacto:
+                template.extend(_wrap_comment(f"Impacto: {impacto}", prefix="#   "))
+            if inferencia:
+                template.extend(_wrap_comment(f"Inferencia: {inferencia}", prefix="#   "))
+
+        template.append("")
+        template.append("# Perguntas principais para o revisor humano:")
+        template.append("# 1) A categoria principal está correta?")
+        template.append("# 2) Quais categorias adicionais devem ser mantidas como secundarias?")
+        template.append("# 3) Cole os trechos do documento que justificam cada categoria e informe se devem treinar o acervo.")
+
+        template.extend(
+            [
+                "",
+                f"documento: {source_path.name}",
+                "status: correto | incorreto",
+                f"categoria_nome_{primary_slug}: {primary_category}  # nao alterar",
+                "confirmar_categoria_principal: sim | nao",
+                f"trecho_evidencia_{primary_slug}: ",
+                f"acao_incluir_conhecimento_{primary_slug}: sim | nao",
+                "justificativa_principal_usuario: ",
+                "confianca_revisada: ",
+                "nova_categoria: ",
+                f"areas_secundarias: {', '.join(secondary_areas) if secondary_areas else ''}",
+                "motivos_relevantes: ",
+                "motivos_criticos: ",
+                "palavras_relevantes: ",
+                "palavras_irrelevantes: ",
+                "aprovar_para_conhecimento: sim | nao",
+                "marcar_reanalise: sim | nao",
+                f"categoria_feedback: {primary_category}",
+                "",
+                "observacoes:",
+            ]
+        )
+
+        candidate_order: List[str] = []
+        candidates: Dict[str, Dict[str, Any]] = {}
+
+        def register_candidate(name: Optional[str], reason: str, score: Optional[float] = None) -> None:
+            if not name:
+                return
+            slug = _slug(name)
+            if not slug or slug == primary_slug:
+                return
+            entry = candidates.get(slug)
+            if entry is None:
+                entry = {"category": name, "reasons": [], "scores": []}
+                candidates[slug] = entry
+                candidate_order.append(slug)
+            entry["reasons"].append(reason)
+            if score is not None:
+                entry["scores"].append(score)
+
+        for area in secondary_areas:
+            register_candidate(area, "Indicada como area secundaria pelo modelo")
+
+        for category_name, score in strong_matches:
+            register_candidate(
+                category_name,
+                "Correspondencia forte (>=80%) nas heuristicas",
+                score,
+            )
+
+        for match in document_matches:
+            register_candidate(
+                match.get("category"),
+                f"Match documental {match.get('score', 0)*100:.0f}% ({match.get('document_count', 0)} doc.)",
+                match.get("score"),
+            )
+
+        for match in knowledge_matches:
+            register_candidate(
+                match.get("category"),
+                f"Similaridade estruturada {match.get('best_match', 0)*100:.0f}%",
+                match.get("best_match"),
+            )
+
+        suggested = result.get("nova_categoria_sugerida")
+        if suggested:
+            register_candidate(suggested, "Categoria alternativa sugerida pelo modelo")
+
+        if candidates:
+            template.append("")
+            template.append("# Categorias adicionais para confirmar (preencha, mesmo que a resposta seja 'nao'):")
+            for slug in candidate_order:
+                entry = candidates[slug]
+                cat_name = entry["category"]
+                reasons = "; ".join(entry.get("reasons") or [])
+                template.append(f"# - {cat_name}: {reasons}")
+                template.append(f"categoria_nome_{slug}: {cat_name}  # nao alterar")
+                template.append(f"categoria_alternativa_{slug}: sim | nao")
+                template.append(f"trecho_evidencia_{slug}: ")
+                template.append(f"acao_incluir_conhecimento_{slug}: sim | nao")
+
+        template.append("")
+        template.append("# Contexto adicional das camadas analisadas:")
+        if knowledge_matches:
+            template.append("#   Estruturada (top 5):")
+            for match in knowledge_matches[:5]:
+                template.append(
+                    f"#     {match.get('category')} | melhor={match.get('best_match', 0):.2f} | media={match.get('average_match', 0):.2f}"
+                )
+        else:
+            template.append("#   Estruturada: nenhuma correspondencia relevante.")
+
+        structured_best = max(
+            (match.get("best_match", 0.0) for match in knowledge_matches), default=0.0
+        )
+        if structured_best < 0.2:
+            template.append("#   Aviso: similaridade estruturada <20%. Considere reforcar knowledge.json.")
+
+        if document_matches:
+            template.append("#   Documental (top 5):")
+            for match in document_matches[:5]:
+                terms = ", ".join((match.get("top_terms") or [])[:4])
+                template.append(
+                    f"#     {match.get('category')} | score={match.get('score', 0):.2f} | docs={match.get('document_count', 0)} | termos={terms}"
+                )
+        else:
+            template.append("#   Documental: ainda sem arquivos reais associados.")
+
+        template.extend(
+            [
+                "",
+                "# Cole apenas trechos literais do documento nos campos 'trecho_evidencia_*'.",
+                "# Marque 'acao_incluir_conhecimento_*' = sim apenas quando o trecho puder treinar o acervo da categoria.",
+                "# Utilize 'areas_secundarias' para listar as categorias confirmadas (separadas por virgula).",
+            ]
+        )
+
+        with open(target, "w", encoding="utf-8") as handler:
             handler.write("\n".join(template))
 
     def _build_summary(self, text: str, limit: int = 600) -> str:

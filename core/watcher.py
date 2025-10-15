@@ -7,7 +7,7 @@ import time
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from core.knowledge_base import KnowledgeBase
 from core.processor import DocumentProcessor
@@ -138,7 +138,8 @@ class IntakeWatcher:
             )
             logging.info("Arquivo %s movido com sucesso. Iniciando pipeline de analise.", file_path.name)
             self._log_processing_folder_state("apos_movimentacao")
-            self._submit_for_processing(target)
+            size_bytes = target.stat().st_size if target.exists() else 0
+            self._submit_for_processing(target, size_bytes)
         except Exception as exc:
             logging.exception("Erro ao mover/processar %s: %s", file_path, exc)
             self.logger.emit(
@@ -146,7 +147,7 @@ class IntakeWatcher:
                 {"file": str(file_path), "error": str(exc)},
             )
 
-    def _submit_for_processing(self, target: Path) -> None:
+    def _submit_for_processing(self, target: Path, size_bytes: int) -> None:
         processing_id = uuid.uuid4().hex[:12]
         enqueued_at = time.time()
         payload = {
@@ -154,6 +155,7 @@ class IntakeWatcher:
             "file": target.name,
             "path": str(target),
             "queue_depth": len(self._active_tasks) + 1,
+            "size_bytes": size_bytes,
         }
         self.logger.emit("processing_enqueued", payload)
         logging.info(
@@ -162,6 +164,22 @@ class IntakeWatcher:
             target.name,
             len(self._active_tasks) + 1,
         )
+        if self.processor.teams_notifier:
+            try:
+                self.processor.teams_notifier.send_activity_event(
+                    title="Documento recebido",
+                    message=f"{target.name} foi recebido e enfileirado para processamento.",
+                    facts=[
+                        ("Processo", processing_id),
+                        ("Arquivo", target.name),
+                        ("Destino", str(target)),
+                        ("Tamanho", f"{size_bytes} bytes"),
+                        ("Fila atual", str(len(self._active_tasks) + 1)),
+                    ],
+                    event_type="intake_received",
+                )
+            except Exception as exc:  # pragma: no cover - notificacoes
+                logging.debug("Falha ao enviar notificacao de recebimento: %s", exc)
         future = self._executor.submit(self.processor.process_file, str(target), processing_id)
         self._active_tasks[processing_id] = {"started_at": enqueued_at, "file": target.name}
         future.add_done_callback(lambda fut, pid=processing_id: self._on_processing_done(pid, fut))
@@ -271,18 +289,21 @@ class FeedbackWatcher:
             logging.warning("Nao foi possivel interpretar feedback em %s", file_path.name)
             return
         self.logger.emit("feedback_received", {"file": file_path.name, "data": data})
+        extras = data.get("extras") if isinstance(data.get("extras"), dict) else {}
         entry = self.knowledge_base.update_entry_feedback(
             file_name=data["documento"],
             status=data["status"],
             observations=data.get("observacoes", ""),
             new_category=data.get("nova_categoria"),
+            extras=extras,
         )
         if entry:
             logging.info(
-                "Feedback aplicado para %s (status=%s, nova_categoria=%s)",
+                "Feedback aplicado para %s (status=%s, nova_categoria=%s, extras=%s)",
                 data["documento"],
                 data.get("status"),
                 data.get("nova_categoria"),
+                extras,
             )
             self.logger.emit(
                 "feedback_applied",
@@ -291,6 +312,7 @@ class FeedbackWatcher:
                     "documento": data["documento"],
                     "status": data.get("status"),
                     "nova_categoria": data.get("nova_categoria"),
+                    "extras": extras,
                 },
             )
         else:
@@ -299,10 +321,26 @@ class FeedbackWatcher:
                 "feedback_missing_entry",
                 {"file": file_path.name, "documento": data["documento"]},
             )
-        self.processed_dir.mkdir(parents=True, exist_ok=True)
-        destination = self.processed_dir / file_path.name
+        archive_category = extras.get("categoria_feedback")
+        if entry and not archive_category:
+            archive_category = entry.get("category")
+        target_folder = self.processed_dir
+        if archive_category:
+            slug = self._slugify_category(str(archive_category))
+            target_folder = self.processed_dir / slug
+        target_folder.mkdir(parents=True, exist_ok=True)
+        destination = target_folder / file_path.name
         shutil.move(str(file_path), destination)
         logging.info("Feedback %s arquivado em %s", file_path.name, destination)
+        if archive_category:
+            self.logger.emit(
+                "feedback_archived",
+                {
+                    "file": file_path.name,
+                    "categoria": archive_category,
+                    "path": str(destination),
+                },
+            )
 
     def _load_feedback_payload(self, file_path: Path) -> Optional[Dict]:
         suffix = file_path.suffix.lower()
@@ -370,6 +408,7 @@ class FeedbackWatcher:
 
     def _parse_key_value_feedback(self, lines: List[str], file_path: Path) -> Optional[Dict]:
         mapping: Dict[str, str] = {}
+        extras_raw: Dict[str, str] = {}
         current_key: Optional[str] = None
         for raw_line in lines:
             line = raw_line.strip()
@@ -390,6 +429,10 @@ class FeedbackWatcher:
                 current_key = None
                 continue
             value = value_part.strip()
+            if mapped_key.startswith("extra:"):
+                extras_raw[mapped_key] = value
+                current_key = None
+                continue
             if mapped_key == "observacoes":
                 existing = mapping.get("observacoes", "")
                 mapping["observacoes"] = (existing + ("\n" if existing else "") + value).strip()
@@ -399,7 +442,7 @@ class FeedbackWatcher:
                 current_key = None
         if not mapping:
             return None
-        return self._normalize_feedback_payload(mapping, file_path)
+        return self._normalize_feedback_payload(mapping, file_path, extras_raw)
 
     def _parse_checkbox_feedback(self, lines: List[str], file_path: Path) -> Optional[Dict]:
         document_name = ""
@@ -460,6 +503,7 @@ class FeedbackWatcher:
 
     def _normalize_feedback_dict(self, data: Dict, file_path: Path) -> Optional[Dict]:
         mapping: Dict[str, str] = {}
+        extras_raw: Dict[str, str] = {}
         for key, value in data.items():
             if not isinstance(key, str):
                 continue
@@ -474,14 +518,16 @@ class FeedbackWatcher:
                 value = ""
             else:
                 value = str(value)
-            if mapped == "observacoes":
+            if mapped.startswith("extra:"):
+                extras_raw[mapped] = value.strip()
+            elif mapped == "observacoes":
                 existing = mapping.get("observacoes", "")
                 mapping["observacoes"] = (existing + ("\n" if existing else "") + value.strip()).strip()
             else:
                 mapping[mapped] = value.strip()
         if not mapping:
             return None
-        return self._normalize_feedback_payload(mapping, file_path)
+        return self._normalize_feedback_payload(mapping, file_path, extras_raw)
 
     def _map_feedback_key(self, raw_key: str) -> Optional[str]:
         normalized = raw_key.strip().lower().replace("-", " ").replace("_", " ")
@@ -493,9 +539,52 @@ class FeedbackWatcher:
             return "nova_categoria"
         if normalized in {"observacoes", "observacao", "justificativa", "comentarios", "comentarios adicionais", "notas"}:
             return "observacoes"
+        if normalized in {"confianca revisada", "confianca_revisada", "confidence", "confidence override"}:
+            return "confidence_override"
+        if normalized in {"areas secundarias", "areas", "areas_secundarias", "multi categoria"}:
+            return "areas_secundarias"
+        if normalized in {"palavras chave relevantes", "palavras relevantes", "keywords relevantes", "keywords_positive"}:
+            return "keywords_positive"
+        if normalized in {"palavras chave irrelevantes", "palavras irrelevantes", "keywords negativas", "keywords_negative"}:
+            return "keywords_negative"
+        if normalized in {"motivos relevantes", "motivos positivos", "pontos fortes"}:
+            return "motivos_relevantes"
+        if normalized in {"motivos criticos", "motivos negativos", "pontos fracos", "alertas"}:
+            return "motivos_criticos"
+        if normalized in {"aprovar para conhecimento", "aprovar conhecimento", "aprovar base", "aprovar documental"}:
+            return "approve_for_knowledge"
+        if normalized in {"marcar reanalise", "solicitar reanalise", "reanalise"}:
+            return "request_reanalysis"
+        if normalized in {"categoria feedback", "categoria_feedback", "categoria pasta"}:
+            return "categoria_feedback"
+        if normalized.startswith("categoria nome"):
+            suffix = normalized.replace("categoria nome", "", 1).strip()
+            if suffix:
+                return f"extra:label:{self._slugify_category(suffix)}"
+        if normalized.startswith("confirmar categoria principal"):
+            return "extra:confirmar_principal"
+        if normalized.startswith("justificativa principal usuario"):
+            return "extra:principal_comment"
+        if normalized.startswith("categoria alternativa"):
+            suffix = normalized.replace("categoria alternativa", "", 1).strip()
+            if suffix:
+                return f"extra:alt:{self._slugify_category(suffix)}"
+        if normalized.startswith("trecho evidencia"):
+            suffix = normalized.replace("trecho evidencia", "", 1).strip()
+            if suffix:
+                return f"extra:evidence:{self._slugify_category(suffix)}"
+        if normalized.startswith("acao incluir conhecimento"):
+            suffix = normalized.replace("acao incluir conhecimento", "", 1).strip()
+            if suffix:
+                return f"extra:include:{self._slugify_category(suffix)}"
         return None
 
-    def _normalize_feedback_payload(self, mapping: Dict[str, str], file_path: Path) -> Dict:
+    def _normalize_feedback_payload(
+        self,
+        mapping: Dict[str, str],
+        file_path: Path,
+        raw_extras: Optional[Dict[str, str]] = None,
+    ) -> Dict:
         document_name = mapping.get("documento") or self._infer_document_from_name(file_path.name)
         status = self._normalize_status(mapping.get("status"))
         nova_categoria = mapping.get("nova_categoria")
@@ -504,11 +593,97 @@ class FeedbackWatcher:
         else:
             nova_categoria = None
         observacoes = (mapping.get("observacoes") or "").strip()
+
+        def parse_list(value: Optional[str]) -> List[str]:
+            if not value:
+                return []
+            text = str(value)
+            for sep in [";", "|"]:
+                text = text.replace(sep, ",")
+            text = text.replace("\n", ",")
+            return [item.strip() for item in text.split(",") if item.strip()]
+
+        def parse_bool(value: Optional[str]) -> Optional[bool]:
+            if value is None:
+                return None
+            normalized_bool = str(value).strip().lower()
+            if normalized_bool in {"sim", "s", "true", "1", "yes"}:
+                return True
+            if normalized_bool in {"nao", "não", "n", "false", "0", "no"}:
+                return False
+            return None
+
+        def parse_float(value: Optional[str]) -> Optional[float]:
+            if value is None or value == "":
+                return None
+            try:
+                return float(str(value).replace(",", ".").replace("%", "").strip())
+            except ValueError:
+                return None
+
+        def clean_label(value: Optional[str]) -> str:
+            if value is None:
+                return ""
+            text = str(value)
+            if "#" in text:
+                text = text.split("#", 1)[0]
+            return text.strip()
+
+        extras: Dict[str, Any] = {}
+        if "confidence_override" in mapping:
+            extras["confidence_override"] = parse_float(mapping.get("confidence_override"))
+        if "areas_secundarias" in mapping:
+            extras["areas_secundarias"] = parse_list(mapping.get("areas_secundarias"))
+        if "keywords_positive" in mapping:
+            extras["keywords_positive"] = parse_list(mapping.get("keywords_positive"))
+        if "keywords_negative" in mapping:
+            extras["keywords_negative"] = parse_list(mapping.get("keywords_negative"))
+        if "motivos_relevantes" in mapping:
+            extras["motivos_relevantes"] = parse_list(mapping.get("motivos_relevantes"))
+        if "motivos_criticos" in mapping:
+            extras["motivos_criticos"] = parse_list(mapping.get("motivos_criticos"))
+        if "approve_for_knowledge" in mapping:
+            extras["approve_for_knowledge"] = parse_bool(mapping.get("approve_for_knowledge"))
+        if "request_reanalysis" in mapping:
+            extras["request_reanalysis"] = parse_bool(mapping.get("request_reanalysis"))
+        if "categoria_feedback" in mapping:
+            extras["categoria_feedback"] = mapping.get("categoria_feedback")
+
+        raw_extras = raw_extras or {}
+        category_feedback: Dict[str, Dict[str, Any]] = {}
+        for key, raw_value in raw_extras.items():
+            if key == "extra:confirmar_principal":
+                extras["confirmar_principal"] = parse_bool(raw_value)
+                continue
+            if key == "extra:principal_comment":
+                extras["principal_comment"] = str(raw_value).strip()
+                continue
+            if key.startswith("extra:"):
+                parts = key.split(":", 2)
+                if len(parts) != 3:
+                    continue
+                _, kind, slug = parts
+                slug = slug.strip()
+                if not slug:
+                    continue
+                entry = category_feedback.setdefault(slug, {})
+                if kind == "label":
+                    entry["label"] = clean_label(raw_value)
+                elif kind == "alt":
+                    entry["selected"] = parse_bool(raw_value)
+                elif kind == "evidence":
+                    entry["evidence"] = str(raw_value).strip()
+                elif kind == "include":
+                    entry["include"] = parse_bool(raw_value)
+        if category_feedback:
+            extras["category_feedback"] = category_feedback
+
         return {
             "documento": document_name,
             "status": status,
             "observacoes": observacoes,
             "nova_categoria": nova_categoria,
+            "extras": extras,
         }
 
     def _normalize_status(self, value: Optional[str]) -> str:
@@ -526,3 +701,8 @@ class FeedbackWatcher:
         if base.startswith("feedback_"):
             return base.replace("feedback_", "", 1)
         return base
+
+    def _slugify_category(self, value: str) -> str:
+        slug = "".join(ch.lower() if ch.isalnum() else "_" for ch in value)
+        slug = "_".join(part for part in slug.split("_") if part)
+        return slug or "geral"
