@@ -289,11 +289,16 @@ def load_settings(env_path: Optional[Path] = None) -> Settings:
         aliases = ENV_ALIASES.get(field.name, ())
         raw_value = _first_env(aliases)
         default_value = getattr(defaults, field.name)
-        if field.type is bool:
+        field_type = field.type
+        if isinstance(field_type, str):
+            normalized_type = field_type.lower()
+        else:
+            normalized_type = field_type
+        if normalized_type in (bool, "bool"):
             values[field.name] = _parse_bool(raw_value, default_value)
-        elif field.type is int:
+        elif normalized_type in (int, "int"):
             values[field.name] = _parse_int(raw_value, default_value, next(iter(aliases), field.name))
-        elif field.type is float:
+        elif normalized_type in (float, "float"):
             values[field.name] = _parse_float(raw_value, default_value, next(iter(aliases), field.name))
         else:
             values[field.name] = raw_value if raw_value is not None else default_value
