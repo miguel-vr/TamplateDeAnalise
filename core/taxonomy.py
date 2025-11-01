@@ -21,32 +21,51 @@ class TaxonomyRuleEngine:
                     "auditoria": 1.1,
                     "regulatorio": 1.0,
                     "regulacao": 1.0,
+                    "regulamento": 1.1,
+                    "circular": 1.0,
+                    "instrucao normativa": 1.4,
+                    "resolucao bcb": 1.3,
+                    "resolucao": 1.0,
+                    "manual de tempos": 1.3,
                     "lgpd": 1.3,
                     "governanca": 1.0,
                     "risco": 0.9,
                     "politica": 0.9,
                     "norma": 0.8,
+                    "homologacao": 1.0,
+                    "validacao": 0.9,
                     "due diligence": 1.2,
                     "controles internos": 1.2,
                     "seguranca do trabalho": 1.1,
                     "saude e seguranca": 1.1,
+                    "pix automatico": 1.1,
                 }
             },
             "juridico": {
                 "keywords": {
                     "clausula": 1.3,
                     "contrato": 1.2,
-                    "obrigacao": 1.0,
-                    "juridico": 1.1,
-                    "lei": 0.9,
+                    "obrigacao": 1.1,
+                    "juridico": 1.2,
                     "penalidade": 1.1,
                     "disposicao": 0.9,
-                    "foro": 1.0,
+                    "foro": 1.1,
                     "litigio": 1.2,
-                    "termo": 0.9,
-                    "acordo": 1.0,
+                    "acordo": 1.1,
                     "responsabilidade civil": 1.3,
-                }
+                    "sentenca": 1.2,
+                    "parecer": 1.0,
+                    "contencioso": 1.3,
+                    "processo judicial": 1.2,
+                },
+                "negative_keywords": {
+                    "pix": 0.8,
+                    "dict": 0.7,
+                    "homologacao": 0.6,
+                    "qr code": 0.6,
+                    "sistema": 0.5,
+                    "servico": 0.4,
+                },
             },
             "financeiro": {
                 "keywords": {
@@ -76,10 +95,19 @@ class TaxonomyRuleEngine:
                     "cloud": 1.0,
                     "dados": 0.8,
                     "api": 0.9,
+                    "pix": 1.6,
+                    "pix automatico": 1.4,
+                    "qr code": 1.4,
+                    "dict": 1.3,
+                    "manual de tempos": 1.2,
+                    "homologacao": 1.2,
                     "algoritmo": 1.1,
                     "prova de conceito": 1.0,
                     "tecnologia": 1.0,
                     "digital": 0.9,
+                    "catalogo de servicos": 1.2,
+                    "comunicacao eletronica": 1.1,
+                    "sfn": 1.0,
                 }
             },
             "recursos humanos / saude ocupacional": {
@@ -168,6 +196,7 @@ class TaxonomyRuleEngine:
 
         result = dict(validation_result)
         current_category = result.get("categoria") or "outros"
+        baseline_confidence = float(result.get("confidence", 0.0))
         normalized_current = _normalize_text(current_category)
         normalized_lookup = { _normalize_text(cat): cat for cat in scores }
         current_profile_key = normalized_lookup.get(normalized_current)
@@ -184,7 +213,18 @@ class TaxonomyRuleEngine:
         key_terms = ", ".join(sorted(set(matches_list))[:5])
         best_kb_match = max((item.get("best_match", 0.0) for item in knowledge_matches), default=0.0)
 
-        if top_score >= self.promote_threshold and normalized_top != normalized_current:
+        allow_promotion = (
+            top_score >= self.promote_threshold
+            and normalized_top != normalized_current
+            and (
+                baseline_confidence < 0.8
+                or top_score >= current_score + 0.8
+                or best_kb_match >= 0.5
+                or current_score < 0.5
+            )
+        )
+
+        if allow_promotion:
             if top_in_known:
                 target_category = known_lookup[normalized_top]
                 action = "promoted_existing"
