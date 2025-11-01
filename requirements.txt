@@ -1,0 +1,10 @@
+﻿# Core LLM client (OpenAI & Azure OpenAI SDK)
+openai>=1.16.0
+# Load .env configuration file
+python-dotenv>=1.0.0
+# PDF text extraction (imported as fitz)
+PyMuPDF>=1.24.0
+# DOCX parsing support
+python-docx>=0.8.11
+# Knowledge base similarity helpers
+numpy>=1.26.0

@@ -6,6 +6,11 @@
 - Runbook rapido: [docs/runbook_operacional.md](docs/runbook_operacional.md)
 - Manual operacional legado: [docs/manual_operacional.md](docs/manual_operacional.md)
 
+## Setup rapido
+1. Crie um virtualenv (opcional, mas recomendado): `python -m venv .venv && .venv\Scripts\activate` (Windows) ou `python -m venv .venv && source .venv/bin/activate` (Linux/Mac).
+2. Instale as dependencias: `pip install -r requirements.txt`. O arquivo inclui `openai`, `python-dotenv`, `PyMuPDF`, `python-docx` e `numpy`.
+3. Copie `/.env.example` para `.env` e preencha os campos obrigatorios antes de iniciar o `main.py`.
+
 ## 1. Visao geral
 - O sistema monitora continuamente `folders/entrada` e inicia um pipeline de classificacao para cada documento novo.
 - O resultado final e um pacote ZIP por documento contendo: arquivo original, `analise.txt` (relatorio tecnico) e `feedback.txt` (formulario editavel), armazenado em `folders/processados/<categoria>/`.
@@ -174,10 +179,32 @@ Depois de criar o arquivo, preencha os campos marcados como TODO no proprio temp
 - `network`: igual ao `absolute`, mas apontando para um compartilhamento montado (`\\fileserver\classificador`, `/mnt/classificador`, etc.). Monte o share antes de iniciar o servico e registre o comando de montagem em `DOC_ANALYZER_STORAGE_MOUNT_COMMAND`.
 > Se `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` ficar vazio, mesmo nos modos `absolute` ou `network`, o sistema volta a se comportar como `relative`.
 
-**Exemplos praticos**
-- Homolog local: `DOC_ANALYZER_STORAGE_MODE=relative`, `DOC_ANALYZER_STORAGE_RELATIVE_ROOT=homolog_folders`. O pipeline cria `homolog_folders/entrada`, `homolog_folders/processados`, etc. dentro da pasta do projeto.
-- Producao em Windows Server: `DOC_ANALYZER_STORAGE_MODE=absolute`, `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT=D:/classificador/producao`. Use `New-Item D:/classificador/producao -ItemType Directory -Force` antes de iniciar o servico.
-- Producoes com share Linux: `DOC_ANALYZER_STORAGE_MODE=network`, `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT=/mnt/classificador`, `DOC_ANALYZER_STORAGE_MOUNT_COMMAND=mount -t cifs //<servidor>/classificador /mnt/classificador -o user=$DOC_ANALYZER_STORAGE_SERVICE_USER`. Execute o comando (ou equivalente `net use` no Windows) no script de inicializacao.
+**Exemplos praticos (passo a passo)**
+
+1. **Homolog local (Windows/Linux/Mac)**
+   - `DOC_ANALYZER_STORAGE_MODE=relative` (default) e, se quiser isolar, `DOC_ANALYZER_STORAGE_RELATIVE_ROOT=homolog_folders`.
+   - Estrutura resultante: `<repo>/homolog_folders/entrada`, `.../em_processamento`, `.../processados`.
+   - Ordem sugerida: criar/ativar virtualenv, `pip install -r requirements.txt`, copiar `.env`, iniciar `python main.py`, soltar documento em `homolog_folders/entrada`.
+
+2. **Producao em Windows Server (drive D:)**
+   - Ajuste `.env`: `DOC_ANALYZER_STORAGE_MODE=absolute`, `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT=D:/classificador/producao`.
+   - Preparacao: `New-Item D:/classificador/producao -ItemType Directory -Force` e garanta permissao de escrita para a conta de servico.
+   - No startup script do servico (ex.: NSSM ou PowerShell agendado):
+     ```powershell
+     Set-Location D:/classificador
+     .venv\Scripts\activate
+     pip install -r requirements.txt  # em deployments fresh
+     python main.py
+     ```
+
+3. **Producao Linux com compartilhamento SMB**
+   - `.env`: `DOC_ANALYZER_STORAGE_MODE=network`, `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT=/mnt/classificador`,
+     `DOC_ANALYZER_STORAGE_SERVICE_USER=svc_classificador`, `DOC_ANALYZER_STORAGE_SERVICE_PASSWORD=<segredo>`,
+     `DOC_ANALYZER_STORAGE_MOUNT_COMMAND=mount -t cifs //<servidor>/classificador /mnt/classificador -o user=$DOC_ANALYZER_STORAGE_SERVICE_USER,pass=$DOC_ANALYZER_STORAGE_SERVICE_PASSWORD,domain=$DOC_ANALYZER_STORAGE_SERVICE_DOMAIN`.
+   - Passos antes de subir o daemon: montar o share (`sudo mount -t cifs ...` ou registrar no `/etc/fstab`), validar permissao com `touch /mnt/classificador/teste.tmp`, iniciar o processo via `systemd`/`supervisor`.
+   - Ordem sugerida: montar share -> ativar virtualenv -> `pip install -r requirements.txt` (se necessario) -> `python main.py`.
+
+> Dica: mesmo em modos `absolute` ou `network`, se `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` ficar vazio o sistema volta a resolver as pastas como `relative`.
 
 ### 8.2 Variaveis obrigatorias (LLM e pipeline)
 | Variavel | Descricao | Default / exemplo |
