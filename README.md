@@ -108,12 +108,22 @@ Passo a passo para introduzir uma nova categoria principal:
 - Ferramenta r+ípida: `tools/submit_feedback.py` continua dispon+¡vel para registrar corre+º+Áes simples via CLI (gera `.json` pronto em `folders/feedback/`). Use `--dry-run` para validar o conte+¦do antes de gravar.
 
 ## 8. Configuracao e parametros (.env)
-- Toda a configuracao vive no `.env`. Copie `/.env.example` para `.env` e ajuste os valores conforme o ambiente. Nao mantenha valores sensiveis em repositorio.
+- Toda a configuracao vive no `.env`. Nunca commite credenciais. Copie `/.env.example` para `.env` e ajuste os valores que estao em branco.
 
-### 8.1 Modos de armazenamento (`DOC_ANALYZER_STORAGE_MODE`)
-- `relative`: usa `DOC_ANALYZER_STORAGE_RELATIVE_ROOT` como pasta raiz dentro do servidor (ex.: `folders`). Subpastas (`entrada`, `processados`, etc.) sao criadas dentro dela. Ideal para ambientes de teste ou quando o servico controla toda a arvore.
-- `absolute`: ignora a raiz relativa e escreve diretamente em `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` (precisa ser um caminho absoluto local). Use quando a infraestrutura ja oferece a pasta final com permissoes preparadas.
-- `network`: mesmo comportamento de `absolute`, mas sinaliza para a equipe que o caminho aponta para um compartilhamento de rede montado previamente. Combine com os campos de usuario de servico e `DOC_ANALYZER_STORAGE_MOUNT_COMMAND` para documentar o procedimento de montagem.
+### 8.0 Criando o arquivo `.env`
+```powershell
+Copy-Item .env.example .env
+```
+```bash
+cp .env.example .env
+```
+Esses comandos replicam o template com todos os defaults e deixam o arquivo pronto para receber as chaves reais em cada ambiente (dev/homolog/prod).
+
+### 8.1 Escolhendo onde as pastas vao morar (`DOC_ANALYZER_STORAGE_MODE`)
+- `relative` (default): base = `<pasta_onde_o_servico_roda>/<DOC_ANALYZER_STORAGE_RELATIVE_ROOT>`. Ex.: rodando em `/opt/classificador`, as pastas ficam em `/opt/classificador/folders/...`.
+- `absolute`: informe `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` (ex.: `D:/classificador_prod` ou `/srv/classificador`). O processo cria/usa `entrada`, `em_processamento`, etc dentro desse caminho. Antes de subir em producao, crie o diretorio e garanta permissao de escrita para o usuario do servico.
+- `network`: igual ao `absolute`, mas apontando para um compartilhamento montado (`\\fileserver\classificador`, `/mnt/classificador`, etc.). Monte o share antes de iniciar o servico e registre o comando em `DOC_ANALYZER_STORAGE_MOUNT_COMMAND`. Se a montagem usar credenciais, documente o usuario/senha/dominio nas variaveis `DOC_ANALYZER_STORAGE_SERVICE_*`.
+> Se `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` ficar vazio, mesmo nos modos `absolute` ou `network`, o sistema volta a se comportar como `relative`.
 
 ### 8.2 Variaveis obrigatorias (LLM e pipeline)
 | Variavel | Descricao | Default / exemplo |
@@ -134,21 +144,22 @@ Passo a passo para introduzir uma nova categoria principal:
 | `DOC_ANALYZER_KNOWLEDGE_BASE_PATH` | Arquivo JSON da base de conhecimento. | `knowledge.json` |
 | `DOC_ANALYZER_CATEGORY_KNOWLEDGE_ROOT` | Pasta com artefatos por categoria. | `knowledge_sources` |
 
-### 8.3 Variaveis de armazenamento e paths
+### 8.3 Subpastas e estrutura interna
 | Variavel | Descricao | Default / exemplo |
 | --- | --- | --- |
 | `DOC_ANALYZER_STORAGE_MODE` | Modo de resolucao de pastas (`relative`, `absolute`, `network`). | `relative` |
-| `DOC_ANALYZER_STORAGE_RELATIVE_ROOT` | Raiz usada em modo `relative`. | `folders` |
-| `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` | Raiz absoluta para `absolute` ou `network`. | `` |
+| `DOC_ANALYZER_STORAGE_RELATIVE_ROOT` | Base local quando o modo e `relative`. | `folders` |
+| `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` | Base absoluta para `absolute` ou `network`. | `` |
 | `DOC_ANALYZER_STORAGE_AUTO_CREATE` | Cria automaticamente a estrutura se `true`. | `true` |
 | `DOC_ANALYZER_STORAGE_CREATE_DEFAULT_CATEGORIES` | Gera pastas padrao de categorias se `true`. | `true` |
-| `DOC_ANALYZER_INPUT_SUBDIR` | Pasta de entrada (relativa ou absoluta). | `entrada` |
-| `DOC_ANALYZER_PROCESSING_SUBDIR` | Pasta de processamento ativo. | `em_processamento` |
+| `DOC_ANALYZER_INPUT_SUBDIR` | Nome da subpasta de entrada (ou caminho absoluto). | `entrada` |
+| `DOC_ANALYZER_PROCESSING_SUBDIR` | Subpasta de processamento ativo. | `em_processamento` |
 | `DOC_ANALYZER_PROCESSING_FAIL_SUBDIR` | Subpasta de falhas internas. | `_falhas` |
-| `DOC_ANALYZER_PROCESSED_SUBDIR` | Pasta de saida (com ZIPs). | `processados` |
-| `DOC_ANALYZER_FEEDBACK_SUBDIR` | Pasta onde chegam feedbacks. | `feedback` |
-| `DOC_ANALYZER_FEEDBACK_PROCESSED_SUBDIR` | Subpasta para feedback tratado. | `processado` |
+| `DOC_ANALYZER_PROCESSED_SUBDIR` | Subpasta de saida (contendo os ZIPs). | `processados` |
+| `DOC_ANALYZER_FEEDBACK_SUBDIR` | Subpasta onde chegam feedbacks. | `feedback` |
+| `DOC_ANALYZER_FEEDBACK_PROCESSED_SUBDIR` | Subpasta de feedback processado. | `processado` |
 | `DOC_ANALYZER_COMPLEX_SAMPLES_SUBDIR` | Repositorio de casos complexos para QA. | `complex_samples` |
+> Quando o valor definido for relativo, o sistema resolve `<raiz_escolhida>/<subpasta>`; se for absoluto, ele usa exatamente o caminho informado.
 
 ### 8.4 Integracoes (Teams e Azure)
 | Variavel | Descricao | Default / exemplo |
@@ -165,13 +176,12 @@ Passo a passo para introduzir uma nova categoria principal:
 | Variavel | Descricao | Default / exemplo |
 | --- | --- | --- |
 | `DOC_ANALYZER_STORAGE_SERVICE_USER` | Usuario de servico para montar o compartilhamento. | `` |
-| `DOC_ANALYZER_STORAGE_SERVICE_PASSWORD` | Senha do usuario de servico (armazenar em cofre quando possivel). | `` |
+| `DOC_ANALYZER_STORAGE_SERVICE_PASSWORD` | Senha do usuario de servico (documente ou mantenha no cofre). | `` |
 | `DOC_ANALYZER_STORAGE_SERVICE_DOMAIN` | Dominio ou realm do usuario de rede. | `` |
-| `DOC_ANALYZER_STORAGE_MOUNT_COMMAND` | Comando documentado para montar o compartilhamento (ex.: `mount -t cifs ...`). | `` |
+| `DOC_ANALYZER_STORAGE_MOUNT_COMMAND` | Comando documentado para montar o compartilhamento. | `mount -t cifs //<servidor>/classificador /mnt/classificador -o user=$DOC_ANALYZER_STORAGE_SERVICE_USER,domain=$DOC_ANALYZER_STORAGE_SERVICE_DOMAIN` |
 
 ### 8.6 Variaveis legadas
 - `OPENAI_API_KEY`, `CLASSIFIER_*`, `TEAMS_WEBHOOK_URL`, `TEAMS_ACTIVITY_WEBHOOK_URL`, `URL_BASE`, `API_KEY`, `DEPLOYMENT_NAME` e similares continuam reconhecidos pela camada de compatibilidade. Em novos ambientes, prefira sempre os nomes `DOC_ANALYZER_*`.
-
 ## 9. Integracao Azure OpenAI
 - Defina `DOC_ANALYZER_USE_AZURE=true` no `.env` e informe:
   - `DOC_ANALYZER_AZURE_ENDPOINT`: URL do recurso Azure OpenAI (ex.: `https://seu-recurso.openai.azure.com`).
