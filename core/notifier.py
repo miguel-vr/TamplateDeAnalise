@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 
 class TeamsNotifier:
-    """Send Adaptive Card summaries to Microsoft Teams via incoming webhook."""
+    """Disparo os Adaptive Cards no Teams para manter o time avisado sem depender do console."""
 
     def __init__(self, analysis_webhook_url: str, activity_webhook_url: Optional[str] = None) -> None:
         self.analysis_webhook_url = (analysis_webhook_url or "").strip()

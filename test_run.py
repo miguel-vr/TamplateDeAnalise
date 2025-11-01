@@ -1,14 +1,15 @@
 import os
 import time
 
-from main import create_components, load_config, setup_logging
+from core.settings import load_settings
+from main import create_components, setup_logging
 
 
 def main(duration: int = 30) -> None:
     """Execute the classifier pipeline for a limited duration (testing helper)."""
-    config = load_config()
-    setup_logging(config)
-    intake_watcher, feedback_watcher = create_components(config)
+    settings = load_settings()
+    setup_logging(settings)
+    intake_watcher, feedback_watcher = create_components(settings)
 
     intake_watcher.start()
     feedback_watcher.start()

@@ -14,7 +14,7 @@ from core.processor import DocumentProcessor
 
 
 class JsonEventLogger:
-    """Utility to append structured events to a JSON lines log file."""
+    """Gravo os eventos estruturados em JSONL para auditar o pipeline sem sofrer com grep depois."""
 
     def __init__(self, log_path: Path):
         self.log_path = log_path
@@ -29,7 +29,7 @@ class JsonEventLogger:
 
 
 class DirectoryWatcher(threading.Thread):
-    """Simple polling-based directory watcher."""
+    """Watcher basico no esquema de polling para ca+oar arquivos novos e disparar o callback."""
 
     def __init__(self, name: str, directory: Path, interval: int, callback: Callable[[Path], None], logger: JsonEventLogger):
         super().__init__(daemon=True, name=name)
@@ -82,7 +82,7 @@ class DirectoryWatcher(threading.Thread):
 
 
 class IntakeWatcher:
-    """High-level watcher for handling incoming documents."""
+    """Fico de olho na pasta de entrada, movo os arquivos para processamento e aciono o executor paralelo."""
 
     def __init__(
         self,
@@ -248,7 +248,7 @@ class IntakeWatcher:
 
 
 class FeedbackWatcher:
-    """Watch feedback folder and apply human feedback to the knowledge base."""
+    """Leio o feedback humano, atualizo a base de conhecimento e arquivo o que ja foi tratado."""
 
     def __init__(
         self,
@@ -609,7 +609,7 @@ class FeedbackWatcher:
             normalized_bool = str(value).strip().lower()
             if normalized_bool in {"sim", "s", "true", "1", "yes"}:
                 return True
-            if normalized_bool in {"nao", "não", "n", "false", "0", "no"}:
+            if normalized_bool in {"nao", "n+uo", "n", "false", "0", "no"}:
                 return False
             return None
 

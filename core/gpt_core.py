@@ -15,7 +15,7 @@ def _normalize_category_name(value: str) -> str:
 
 
 class GPTServiceUnavailable(Exception):
-    """Raised when the GPT service cannot be reached or returns an authorization error."""
+    """Levanto esse erro quando o GPT nao responde ou corta a chamada por falta de autorizacao."""
 
     def __init__(self, message: str, original: Optional[Exception] = None):
         super().__init__(message)
@@ -29,7 +29,7 @@ except ImportError:  # pragma: no cover - library not installed yet
 
 
 class GPTCore:
-    """Encapsulates all GPT interactions for document understanding."""
+    """Centraliza minhas chamadas ao GPT: montagem dos prompts, retries e ajustes com base no conhecimento local."""
 
     def __init__(self, config: Dict, knowledge_base: KnowledgeBase):
         self.config = config
@@ -157,7 +157,7 @@ class GPTCore:
             primary = self._offline_analysis(text, metadata, context_summary)
             cross = {"agreement": "offline", "confidence_adjustment": 0, "notes": "Offline mode - heuristic result"}
             i3 = {
-                "explanation": primary.get("justificativa", "Análise heurística baseada em similaridade."),
+                "explanation": primary.get("justificativa", "An+ilise heur+stica baseada em similaridade."),
                 "reliability_reasoning": "Offline similarity heuristic",
             }
         else:
@@ -237,9 +237,9 @@ class GPTCore:
             {
                 "role": "system",
                 "content": (
-                    "Você é um especialista em classificação de documentos corporativos. "
-                    "Recebeu uma classificação anterior com baixa confiança. "
-                    "Reavalie cuidadosamente considerando as observações abaixo."
+                    "Voc+ + um especialista em classifica+o+uo de documentos corporativos. "
+                    "Recebeu uma classifica+o+uo anterior com baixa confian+oa. "
+                    "Reavalie cuidadosamente considerando as observa+o+Aes abaixo."
                 ),
             },
             {
@@ -313,9 +313,9 @@ class GPTCore:
             {
                 "role": "system",
                 "content": (
-                    "Você é um classificador especialista em documentação corporativa. "
+                    "Voc+ + um classificador especialista em documenta+o+uo corporativa. "
                     "Classifique documentos por categoria e tema considerando o contexto completo."
-                    " Responda sempre em JSON válido."
+                    " Responda sempre em JSON v+ilido."
                 ),
             },
             {"role": "user", "content": prompt},
@@ -346,8 +346,8 @@ class GPTCore:
             {
                 "role": "system",
                 "content": (
-                    "Você atua como auditor independente validando classificações de documentos. "
-                    "Avalie coerência, confiança e possíveis erros. Responda em JSON válido."
+                    "Voc+ atua como auditor independente validando classifica+o+Aes de documentos. "
+                    "Avalie coer+ncia, confian+oa e poss+veis erros. Responda em JSON v+ilido."
                 ),
             },
             {"role": "user", "content": prompt},
@@ -384,8 +384,8 @@ class GPTCore:
             {
                 "role": "system",
                 "content": (
-                    "Você gera explicações estruturadas (camada I3 - Insight, Impacto, Inferência) "
-                    "para classificações de documentos. Foque em clareza e objetividade. Responda em JSON válido."
+                    "Voc+ gera explica+o+Aes estruturadas (camada I3 - Insight, Impacto, Infer+ncia) "
+                    "para classifica+o+Aes de documentos. Foque em clareza e objetividade. Responda em JSON v+ilido."
                 ),
             },
             {"role": "user", "content": prompt},
@@ -442,18 +442,18 @@ class GPTCore:
         template = {
             "document_name": metadata.get("file_name"),
             "instructions": {
-                "objective": "Classificar o documento por categoria principal, tema e áreas secundárias.",
+                "objective": "Classificar o documento por categoria principal, tema e +ireas secund+irias.",
                 "confidence_format": "Valor percentual de 0 a 100.",
-                "new_category_rule": "Se não houver categoria adequada, proponha uma nova categoria com justificativa.",
+                "new_category_rule": "Se n+uo houver categoria adequada, proponha uma nova categoria com justificativa.",
                 "context": context_summary,
                 "known_categories": known_categories or ["tecnologia", "juridico", "financeiro", "compliance", "outros"],
                 "knowledge_usage": (
                     "Quando sugerir nova categoria, descreva claramente porque ela difere das categorias conhecidas. "
-                    "Sempre forneça justificativa baseada em evidências textuais específicas."
+                    "Sempre forne+oa justificativa baseada em evid+ncias textuais espec+ficas."
                 ),
                 "document_knowledge_guidance": (
-                    "Considere também os termos característicos aprendidos a partir de arquivos reais confirmados em cada categoria. "
-                    "Se o documento atual divergir radicalmente desse histórico, explique a diferença."
+                    "Considere tamb+m os termos caracter+sticos aprendidos a partir de arquivos reais confirmados em cada categoria. "
+                    "Se o documento atual divergir radicalmente desse hist+rico, explique a diferen+oa."
                 ),
                 "feedback_guidance": (
                     "Analise o historico de feedback humano por categoria (aprovacoes, rejections, pedidos de reanalise). "
@@ -461,9 +461,9 @@ class GPTCore:
                 ),
                 "category_profiles": category_brief,
                 "validation_layers": [
-                    "Evidencie a aderência da categoria escolhida citando palavras-chave relevantes.",
+                    "Evidencie a ader+ncia da categoria escolhida citando palavras-chave relevantes.",
                     "Informe categorias alternativas relevantes com justificativas e grau de match.",
-                    "Classifique a necessidade de multiatribuição (categorias extras) quando houver forte sobreposição."
+                    "Classifique a necessidade de multiatribui+o+uo (categorias extras) quando houver forte sobreposi+o+uo."
                 ],
             },
             "category_document_profiles": document_brief,
@@ -517,7 +517,7 @@ class GPTCore:
             "primary_result": primary,
             "feedback_profiles": feedback_brief,
             "instructions": {
-                "task": "Validar a análise primária destacando concordância, ajustes de confiança e riscos.",
+                "task": "Validar a an+ilise prim+iria destacando concord+oncia, ajustes de confian+oa e riscos.",
                 "expected_fields": {
                     "agreement": "string",
                     "confidence_adjustment": "number (-20 a +20)",
@@ -532,8 +532,8 @@ class GPTCore:
                     "Considere o historico de feedback humano para confirmar ajustes de confianca e riscos antes da decisao final."
                 ),
                 "consistency_checks": [
-                    "Caso discorde da categoria proposta, indique alternativa e evidências.",
-                    "Avalie a necessidade de múltiplas categorias e atribua um score de match."
+                    "Caso discorde da categoria proposta, indique alternativa e evid+ncias.",
+                    "Avalie a necessidade de m+ltiplas categorias e atribua um score de match."
                 ],
             },
             "document_excerpt": text[:2000],
@@ -581,7 +581,7 @@ class GPTCore:
             "context_summary": context_summary,
             "feedback_profiles": feedback_brief,
             "instructions": {
-                "objective": "Gerar explicação I3 (Insight, Impacto, Inferência) e motivo do score final.",
+                "objective": "Gerar explica+o+uo I3 (Insight, Impacto, Infer+ncia) e motivo do score final.",
                 "expected_fields": {
                     "insight": "string",
                     "impacto": "string",
@@ -595,8 +595,8 @@ class GPTCore:
                     "Relacione a explicacao I3 com os aprendizados de feedback humano (motivos positivos e alertas recorrentes)."
                 ),
                 "traceability": [
-                    "Forneça um why-trace conectando evidências às regras e categorias pré-definidas.",
-                    "Liste palavras-chave determinantes para a decisão e correlacione com histórico conhecido."
+                    "Forne+oa um why-trace conectando evid+ncias +as regras e categorias pr+-definidas.",
+                    "Liste palavras-chave determinantes para a decis+uo e correlacione com hist+rico conhecido."
                 ],
             },
         }
@@ -638,8 +638,8 @@ class GPTCore:
             "previous_result": previous_result,
             "feedback_profiles": feedback_brief,
             "instructions": {
-                "focus": "Busque evidências adicionais no texto para elevar confiança. Caso não seja possível, proponha nova categoria.",
-                "fallback": "Se persistir incerteza, retorne categoria como 'Não identificada' e sugira nova categoria plausível.",
+                "focus": "Busque evid+ncias adicionais no texto para elevar confian+oa. Caso n+uo seja poss+vel, proponha nova categoria.",
+                "fallback": "Se persistir incerteza, retorne categoria como 'N+uo identificada' e sugira nova categoria plaus+vel.",
                 "known_categories": known_categories,
                 "category_profiles": category_brief,
                 "document_knowledge_profiles": document_brief,
@@ -688,10 +688,10 @@ class GPTCore:
             combined_confidence = confidence_raw + cross_adj
         combined_confidence = max(0.0, min(100.0, combined_confidence))
         confidence_ratio = round(combined_confidence / 100.0, 4)
-        category = primary.get("categoria_principal") or "Não identificada"
+        category = primary.get("categoria_principal") or "N+uo identificada"
         result = {
             "categoria": category,
-            "tema": primary.get("tema", "Tema não identificado"),
+            "tema": primary.get("tema", "Tema n+uo identificado"),
             "areas_secundarias": primary.get("areas_secundarias", []),
             "confidence_percent": round(combined_confidence, 2),
             "confidence": confidence_ratio,
@@ -1046,7 +1046,7 @@ class GPTCore:
 
     def _format_similarity_context(self, similar: List[Tuple[Dict, float]]) -> str:
         if not similar:
-            return "Sem correspondências fortes em conhecimento local."
+            return "Sem correspond+ncias fortes em conhecimento local."
         summary = []
         for entry, score in similar:
             summary.append(
@@ -1064,22 +1064,22 @@ class GPTCore:
             confidence = round(score * 100, 2)
             return {
                 "categoria_principal": best_entry.get("category", "outros"),
-                "tema": best_entry.get("theme", "Tema baseado em histórico"),
+                "tema": best_entry.get("theme", "Tema baseado em hist+rico"),
                 "areas_secundarias": best_entry.get("areas_secundarias", []),
                 "confianca": confidence,
                 "justificativa": (
-                    f"Classificação inferida a partir de similaridade histórica (score {score:.2f}). Contexto: {context_summary}"
+                    f"Classifica+o+uo inferida a partir de similaridade hist+rica (score {score:.2f}). Contexto: {context_summary}"
                 ),
-                "motivos_chave": ["Resultado heurístico por similaridade textual."],
+                "motivos_chave": ["Resultado heur+stico por similaridade textual."],
                 "nova_categoria_sugerida": None,
             }
         return {
             "categoria_principal": "outros",
-            "tema": "Tema heurístico",
+            "tema": "Tema heur+stico",
             "areas_secundarias": [],
             "confianca": 55,
-            "justificativa": "Nenhuma correspondência forte encontrada. Classificação padrão aplicada.",
-            "motivos_chave": ["Resultado heurístico por ausência de contexto histórico."],
+            "justificativa": "Nenhuma correspond+ncia forte encontrada. Classifica+o+uo padr+uo aplicada.",
+            "motivos_chave": ["Resultado heur+stico por aus+ncia de contexto hist+rico."],
             "nova_categoria_sugerida": None,
         }
 

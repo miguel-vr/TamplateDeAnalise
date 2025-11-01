@@ -5,7 +5,7 @@ from core.gpt_core import GPTCore
 
 
 class Validator:
-    """Validates classification outputs and triggers reanalysis if confidence is low."""
+    """Confere a confianca do GPT e puxa novas tentativas quando o score nao bate o corte minimo."""
 
     def __init__(self, config: Dict, gpt_core: GPTCore):
         self.config = config
@@ -34,15 +34,15 @@ class Validator:
 
         if current.get("confidence", 0) < self.threshold:
             logging.warning(
-                "Confidence remains below threshold after %s attempts. Flagging as Não identificada.",
+                "Confidence remains below threshold after %s attempts. Flagging as N+uo identificada.",
                 self.max_retries,
             )
-            current["categoria"] = "Não identificada"
-            current.setdefault("nova_categoria_sugerida", "Categoria a ser definida pelo usuário")
+            current["categoria"] = "N+uo identificada"
+            current.setdefault("nova_categoria_sugerida", "Categoria a ser definida pelo usu+irio")
             current.setdefault(
                 "justificativa",
                 current.get("justificativa", "")
-                + "\nConfiança insuficiente. Recomenda-se revisão humana e eventual criação de nova categoria.",
+                + "\nConfian+oa insuficiente. Recomenda-se revis+uo humana e eventual cria+o+uo de nova categoria.",
             )
             current = self._normalize_entry(current, force_min=self.threshold / 2)
         current["validation_attempts"] = attempt

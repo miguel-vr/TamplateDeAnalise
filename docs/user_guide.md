@@ -7,15 +7,15 @@
 - A base de conhecimento combina três camadas: histórico estruturado (`knowledge.json`), documentos reais por categoria (`knowledge_sources/`) e feedback humano consolidado.
 
 ## 2. Preparação do ambiente
-1. **Clonar o projeto** e instalar dependências opcionais (`pip install -r requirements.txt` se existir).
-2. **Configurar credenciais** (`config.json` ou variáveis de ambiente):
-   - `api_key` ou parâmetros Azure para o modelo usado pelo GPT.
-   - `teams_webhook_url`: webhook do Teams que recebe o Adaptive Card final.
-   - `teams_activity_webhook_url`: webhook (pode ser o mesmo chat) para avisos de “documento recebido” e “documento processado”.
-3. **Ajustar caminhos** conforme necessário:
-   - `storage_root`: diretório base onde ficarão entrada, processamento, processados e feedback.
-   - `input_subdir`, `processing_subdir`, `processed_subdir`, etc., podem ser alterados para refletir compartilhamentos de rede ou convenções internas.
-   - `knowledge_base_path` pode ser apontado para um caminho absoluto compartilhado.
+2. **Configurar credenciais** via `.env` (use o `/.env.example` como base):
+   - `DOC_ANALYZER_API_KEY` ou os parametros Azure (`DOC_ANALYZER_AZURE_ENDPOINT`, `DOC_ANALYZER_AZURE_API_KEY`, `DOC_ANALYZER_AZURE_DEPLOYMENT`, `DOC_ANALYZER_AZURE_API_VERSION`).
+   - `DOC_ANALYZER_TEAMS_WEBHOOK_URL`: webhook do Teams que recebe o Adaptive Card final.
+   - `DOC_ANALYZER_TEAMS_ACTIVITY_WEBHOOK_URL`: webhook (pode ser o mesmo chat) para avisos de "documento recebido" e "documento processado".
+3. **Ajustar caminhos** conforme necess?rio no `.env`: 
+   - `DOC_ANALYZER_STORAGE_MODE` + `DOC_ANALYZER_STORAGE_RELATIVE_ROOT` / `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` definem onde ficar?o as pastas.
+   - `DOC_ANALYZER_INPUT_SUBDIR`, `DOC_ANALYZER_PROCESSING_SUBDIR`, `DOC_ANALYZER_PROCESSED_SUBDIR`, etc., podem ser alterados para refletir compartilhamentos de rede ou conven??es internas.
+   - `DOC_ANALYZER_KNOWLEDGE_BASE_PATH` pode apontar para um caminho absoluto compartilhado.
+4. **Executar `python main.py`**. O servi?o cria as pastas ausentes, verifica a conectividade com a API e inicia os watchers.
 4. **Executar `python main.py`**. O serviço cria as pastas ausentes, verifica a conectividade com a API e inicia os watchers.
 
 ## 3. Ciclo operacional
@@ -53,9 +53,9 @@ Cada feedback impacta diretamente os pr�ximos resultados:
 3. **Monitorar aprendizados**: `analise.txt` mostra as palavras reforçadas/removidas e o balanço de feedback por categoria.
 
 ## 6. Customização rápida de caminhos
-- Ajuste `storage_root` e subdiretórios no `config.json` para apontar para compartilhamentos de rede.
-- Diretórios informados com caminhos absolutos são usados diretamente; strings relativas são resolvidas a partir de `storage_root`.
-- Para logs ou base de conhecimento externos, configure `log_file`, `text_log_file` e `knowledge_base_path` com caminhos absolutos.
+- Ajuste `DOC_ANALYZER_STORAGE_MODE` e os subdiretorios correspondentes no `.env` para apontar para compartilhamentos de rede.
+- Diret�rios informados com caminhos absolutos s�o usados diretamente; strings relativas ficam penduradas em `DOC_ANALYZER_STORAGE_RELATIVE_ROOT`.
+- Para logs ou base de conhecimento externos, configure `DOC_ANALYZER_LOG_FILE`, `DOC_ANALYZER_TEXT_LOG_FILE` e `DOC_ANALYZER_KNOWLEDGE_BASE_PATH` com caminhos absolutos.
 
 ## 7. Resolução de problemas
 - **Webhook não recebe mensagens**: verificar URLs (`teams_webhook_url`, `teams_activity_webhook_url`) e logs de erro (`Adaptive Card webhook retornou status ...`).

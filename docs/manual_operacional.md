@@ -6,7 +6,7 @@ Este guia explica o uso diario do Classifica sem comandos tecnicos. A equipe de 
 ## 2. Estrutura de pastas
 - `folders/entrada/`: coloque aqui os documentos brutos que precisam ser classificados.
 - `folders/em_processamento/`: usado automaticamente pelo sistema enquanto o arquivo esta em analise.
-- `folders/processados/<categoria>/`: sa√≠da final. Cada documento analisado gera um arquivo ZIP contendo:
+- `folders/processados/<categoria>/`: sa+°da final. Cada documento analisado gera um arquivo ZIP contendo:
   - documento original
   - `analise.txt` com justificativas e motivos
   - `feedback.txt` (modelo para ajuste manual, se desejar)
@@ -51,7 +51,7 @@ Para usuarios que preferem uma interface simples:
 Ambos os metodos atualizam instantaneamente a base de conhecimento.
 
 ## 5. Notificacoes Teams
-- O webhook deve ser configurado previamente em `config.json` (`teams_webhook_url`) ou via variavel de ambiente `TEAMS_WEBHOOK_URL`.
+- Configure os webhooks no `.env` (`DOC_ANALYZER_TEAMS_WEBHOOK_URL` e `DOC_ANALYZER_TEAMS_ACTIVITY_WEBHOOK_URL`). Variaveis legadas (`TEAMS_WEBHOOK_URL`/`TEAMS_ACTIVITY_WEBHOOK_URL`) seguem aceitas.
 - Cada card inclui um botao "Abrir pasta do artefato" apontando para o ZIP correspondente.
 - Em caso de falha no envio, o log `system.log` registra o erro (sem impactar a classificacao).
 

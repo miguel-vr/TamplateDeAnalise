@@ -32,7 +32,7 @@ SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 
 class _ProcessingTimeline:
-    """Helper to consolidate stage logging and structured events."""
+    """Guardo o passo a passo de cada arquivo para eu bater o olho e entender onde o fluxo gastou tempo."""
 
     def __init__(
         self,
@@ -183,7 +183,7 @@ class _ProcessingTimeline:
 
 
 class DocumentProcessor:
-    """Coordinates document ingestion, GPT analysis, and artifact generation."""
+    """Orquestra o pipeline completo: tira o arquivo da fila, chama GPT, passa pelas regras e gera o pacote final."""
 
     def __init__(
         self,
@@ -549,7 +549,7 @@ class DocumentProcessor:
 
     def _read_pdf(self, path: Path) -> str:
         if fitz is None:
-            logging.error("PyMuPDF (fitz) não está instalado. Não é possível processar PDFs.")
+            logging.error("PyMuPDF (fitz) n+uo est+i instalado. N+uo + poss+vel processar PDFs.")
             return ""
         try:
             logging.info("Abrindo PDF %s para extracao de texto", path.name)
@@ -563,7 +563,7 @@ class DocumentProcessor:
 
     def _read_docx(self, path: Path) -> str:
         if Document is None:
-            logging.error("python-docx não está instalado. Não é possível processar DOCX.")
+            logging.error("python-docx n+uo est+i instalado. N+uo + poss+vel processar DOCX.")
             return ""
         try:
             logging.info("Abrindo DOCX %s para extracao de texto", path.name)
@@ -756,7 +756,7 @@ class DocumentProcessor:
         if knowledge_matches:
             best_structured = max(match.get("best_match", 0.0) for match in knowledge_matches)
             if best_structured < 0.2:
-                lines.append("  *Aviso*: similaridade baixa com o histórico estruturado; considere revisar knowledge.json.")
+                lines.append("  *Aviso*: similaridade baixa com o hist+rico estruturado; considere revisar knowledge.json.")
 
         document_matches = result.get("document_knowledge_matches") or []
         if document_matches:
@@ -912,7 +912,7 @@ class DocumentProcessor:
             f"# Documento analisado: {source_path.name}",
             f"# Categoria principal sugerida: {primary_category}",
             f"# Tema sugerido: {theme}",
-            f"# Áreas secundarias sugeridas: {_fmt_list(secondary_areas)}",
+            f"# +ureas secundarias sugeridas: {_fmt_list(secondary_areas)}",
             f"# Confianca final: {confidence_percent:.2f}% (tentativas de validacao: {validation_attempts})",
         ]
 
@@ -957,7 +957,7 @@ class DocumentProcessor:
 
         template.append("")
         template.append("# Perguntas principais para o revisor humano:")
-        template.append("# 1) A categoria principal está correta?")
+        template.append("# 1) A categoria principal est+i correta?")
         template.append("# 2) Quais categorias adicionais devem ser mantidas como secundarias?")
         template.append("# 3) Cole os trechos do documento que justificam cada categoria e informe se devem treinar o acervo.")
 

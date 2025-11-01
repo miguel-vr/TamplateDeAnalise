@@ -3,6 +3,7 @@
 ## Documentacao complementar
 - Guia do usuario: [docs/user_guide.md](docs/user_guide.md)
 - Arquitetura e fluxo: [docs/architecture.md](docs/architecture.md)
+- Runbook rapido: [docs/runbook_operacional.md](docs/runbook_operacional.md)
 - Manual operacional legado: [docs/manual_operacional.md](docs/manual_operacional.md)
 
 ## 1. Visao geral
@@ -16,11 +17,11 @@
 - **Watchers**
   - `core/watcher.DirectoryWatcher`: thread de polling generica que dispara callbacks por arquivo.
   - `core/watcher.IntakeWatcher`: move arquivos da pasta de entrada para `folders/em_processamento`, registra estado da fila e aciona o `DocumentProcessor` em paralelo (executor configuravel).
-  - `core/watcher.FeedbackWatcher`: interpreta feedbacks (`.json` ou `.txt`), normaliza campos (`documento`, `status`, `nova_categoria`, `observacoes`), processa confirma√ß√µes/evid√™ncias por categoria e arquiva tanto o formul√°rio quanto os trechos aprovados em `knowledge_sources/<categoria>/feedback_*.txt`.
+  - `core/watcher.FeedbackWatcher`: interpreta feedbacks (`.json` ou `.txt`), normaliza campos (`documento`, `status`, `nova_categoria`, `observacoes`), processa confirma+∫+¡es/evid+¨ncias por categoria e arquiva tanto o formul+Ìrio quanto os trechos aprovados em `knowledge_sources/<categoria>/feedback_*.txt`.
 - **Pipeline de processamento**
   - `core/processor.DocumentProcessor`: encapsula todo o fluxo. Cada etapa gera eventos via `_ProcessingTimeline`, inclui metricas de duracao, aciona heuristicas, atualiza a base e dispara notificacoes.
   - `core/taxonomy.TaxonomyRuleEngine`: calcula scores de palavras-chave por categoria, ajusta classificacoes (promocao/reducao) e gera composicao de confianca (LLM + heuristica + conhecimento).
-  - `core/notifier.TeamsNotifier`: publica o Adaptive Card final e os avisos transacionais (recebido/processado) nos webhooks configurados em `config.json`.
+  - `core/notifier.TeamsNotifier`: publica o Adaptive Card final e os avisos transacionais (recebido/processado) nos webhooks configurados no `.env`.
 - **Camadas de analise**
   - `core/gpt_core.GPTCore`: executa prompts principais, validacao cruzada e camada I3, alem de ajustar categorias com base em conhecimento local.
   - `core/validator.Validator`: reexecuta a analise quando a confianca esta abaixo do limite, normaliza porcentagens e notifica tentativas adicionais.
@@ -49,7 +50,7 @@
 ### Base documental por categoria
 - O diretorio configurado em `category_knowledge_root` (padrao `knowledge_sources/`) armazena pastas por categoria com documentos reais ja validados pelo time.
 - `KnowledgeBase.refresh_category_documents()` monitora essas pastas, calcula hash para evitar reprocessar arquivos e extrai termos caracteristicos por categoria; cada atualizacao e registrada em log.
-- Durante a analise, `GPTCore` injeta esse vocabul√°rio nos prompts (primario, auditoria e I3) e adiciona uma camada de validacao `document_knowledge` que ajusta categorias, areas secundarias e confianca final.
+- Durante a analise, `GPTCore` injeta esse vocabul+Ìrio nos prompts (primario, auditoria e I3) e adiciona uma camada de validacao `document_knowledge` que ajusta categorias, areas secundarias e confianca final.
 - Novas categorias sao provisionadas automaticamente (pasta + `category.json`) quando o pipeline consolida uma classificacao principal ou secundaria inedita; tambem e possivel criar a pasta manualmente e ela sera absorvida no proximo refresh.
 - Para validacao manual, um documento por categoria foi colocado em `knowledge_sources/` (contabilidade, tecnologia, tesouraria) e outros dois exemplos por categoria estao em `samples/` para testes do usuario.
 
@@ -58,12 +59,12 @@ Passo a passo para introduzir uma nova categoria principal:
 2. Adicione ao menos um documento ja validado para essa categoria (TXT, PDF ou DOCX). Os arquivos podem ser adicionados gradualmente; apenas os novos sao processados a cada varredura.
 3. Execute o pipeline (`python main.py`). A camada documental sera atualizada nos logs (`KnowledgeBase.refresh_category_documents`), exibindo hashes, termos extraidos e contadores de documentos.
 4. Caso o GPT identifique essa categoria como principal ou secundaria, a pasta correspondente em `folders/processados/` sera criada automaticamente e o feedback template passara a sugerir o mesmo nome.
-5. (Opcional) Para pre-treinar sem novos documentos de entrada, execute `python main.py` ap√≥s adicionar os arquivos a `knowledge_sources/`; o scan inicial popula o vocabul√°rio e fica disponivel para futuras decis√µes.
+5. (Opcional) Para pre-treinar sem novos documentos de entrada, execute `python main.py` ap+¶s adicionar os arquivos a `knowledge_sources/`; o scan inicial popula o vocabul+Ìrio e fica disponivel para futuras decis+¡es.
 
 ### Feedback inteligente e aprendizado continuo
 - O template `feedback.txt` agora contem campos explicitos (`status`, `confianca_revisada`, `areas_secundarias`, `motivos_relevantes`, `motivos_criticos`, `palavras_relevantes`, `palavras_irrelevantes`, `aprovar_para_conhecimento`, `marcar_reanalise`, `categoria_feedback`, `observacoes`). Separe listas por virgula.
 - O watcher `FeedbackWatcher` interpreta esses campos, armazena o feedback detalhado e ajusta dinamicamente: contagens de aprovacao/rejeicao, listas de palavras reforcadas/removidas, pedidos de reanalise e aprovacoes para a base documental.
-- Ajustes positivos elevam a confianca final (at√© +0,03) enquanto rejeicoes ou multiplos pedidos de reprocessamento reduzem a nota (ate -0,05). Esses deltas sao registrados em `feedback_adjustment_details` e exibidos na analise.
+- Ajustes positivos elevam a confianca final (at+Æ +0,03) enquanto rejeicoes ou multiplos pedidos de reprocessamento reduzem a nota (ate -0,05). Esses deltas sao registrados em `feedback_adjustment_details` e exibidos na analise.
 - Cada feedback processado e arquivado em `folders/feedback/processado/<categoria>/`, facilitando auditoria historica.
 - Campos `palavras_relevantes` e `palavras_irrelevantes` alteram imediatamente o dicionario de palavras-chave da categoria; os logs listam as entradas adicionadas ou removidas.
 - Quando `marcar_reanalise: sim`, o registro permanece marcado para reforco em futuras execucoes; `aprovar_para_conhecimento: sim` sinaliza que o arquivo pode ser incorporado a `knowledge_sources/` sem passos adicionais.
@@ -84,7 +85,7 @@ Passo a passo para introduzir uma nova categoria principal:
   - Feedbacks aplicados (ou rejeitados) com identificacao do documento.
 
 ## 6. Notificacoes via Microsoft Teams
-- Configure `teams_webhook_url` em `config.json` (ou via variavel de ambiente `TEAMS_WEBHOOK_URL`).
+- Configure `DOC_ANALYZER_TEAMS_WEBHOOK_URL` e `DOC_ANALYZER_TEAMS_ACTIVITY_WEBHOOK_URL` no `.env` (vari+Ìveis legadas `TEAMS_WEBHOOK_URL` e `TEAMS_ACTIVITY_WEBHOOK_URL` ainda funcionam).
 - Cada analise concluida envia um Adaptive Card contendo:
   - nome do arquivo, categoria, confianca, caminho do ZIP;
   - resumo das etapas com duracao (linha do tempo);
@@ -94,61 +95,96 @@ Passo a passo para introduzir uma nova categoria principal:
 - Logs registram qualquer falha ao enviar o card (`Falha ao enviar notificacao Teams`). Nenhum erro bloqueia o pipeline.
 
 ## 7. Feedback colaborativo
-- `feedback.txt` agora orienta a revis√£o com perguntas diretas:
+- `feedback.txt` agora orienta a revis+˙o com perguntas diretas:
   - `confirmar_categoria_principal: sim | nao` e `trecho_evidencia_<slug>` (para a categoria principal e as sugeridas) garantem que o revisor cole o trecho literal do documento.
-  - `acao_incluir_conhecimento_<slug>: sim | nao` controla se o trecho ser√° gravado como `knowledge_sources/<categoria>/feedback_<hash>.txt`, alimentando automaticamente a camada documental.
-  - `categoria_nome_<slug>` vem preenchido (n√£o alterar) e permite que o watcher associe o slug ao nome oficial da categoria.
+  - `acao_incluir_conhecimento_<slug>: sim | nao` controla se o trecho ser+Ì gravado como `knowledge_sources/<categoria>/feedback_<hash>.txt`, alimentando automaticamente a camada documental.
+  - `categoria_nome_<slug>` vem preenchido (n+˙o alterar) e permite que o watcher associe o slug ao nome oficial da categoria.
   - `categoria_alternativa_<slug>` e `areas_secundarias` consolidam categorias adicionais confirmadas pelo humano.
-- Cada feedback processado √© arquivado em `folders/feedback/processado/<categoria>/` e gera uma entrada completa no `feedback_history`, incluindo quais trechos viraram evid√™ncia documental.
+- Cada feedback processado +Æ arquivado em `folders/feedback/processado/<categoria>/` e gera uma entrada completa no `feedback_history`, incluindo quais trechos viraram evid+¨ncia documental.
 - O `FeedbackWatcher` passa a:
-  - recalibrar confian√ßa e √°reas secund√°rias com base nas respostas,
-  - incorporar as evid√™ncias aprovadas ao diret√≥rio da categoria (refrescando tokens e termos recorrentes),
-  - manter estat√≠sticas de aprova√ß√£o/reprocessamento por categoria.
-- Ferramenta r√°pida: `tools/submit_feedback.py` continua dispon√≠vel para registrar corre√ß√µes simples via CLI (gera `.json` pronto em `folders/feedback/`). Use `--dry-run` para validar o conte√∫do antes de gravar.
+  - recalibrar confian+∫a e +Ìreas secund+Ìrias com base nas respostas,
+  - incorporar as evid+¨ncias aprovadas ao diret+¶rio da categoria (refrescando tokens e termos recorrentes),
+  - manter estat+°sticas de aprova+∫+˙o/reprocessamento por categoria.
+- Ferramenta r+Ìpida: `tools/submit_feedback.py` continua dispon+°vel para registrar corre+∫+¡es simples via CLI (gera `.json` pronto em `folders/feedback/`). Use `--dry-run` para validar o conte+¶do antes de gravar.
 
-## 8. Configuracao e parametros (config.json)
-- `api_key`, `model`, `cross_validation_model`: credenciais/modelos usados pelo GPT.
-- `use_azure`, `azure_endpoint`, `azure_api_key`, `azure_deployment`, `azure_api_version`: configuracoes para usar Azure OpenAI (ver secao 9).
-- `confidence_threshold`, `max_retries`: controle de reforco da camada Validator (padrao 0.8 e 3 tentativas, com reanalise automatica ate superar 80%).
-- `polling_interval`, `feedback_polling_interval`: frequencia de varredura dos watchers (segundos).
-- `processing_workers`: numero de threads paralelas para analise.
-- `log_level`, `log_file`, `text_log_file`: configuracao de log.
-- `knowledge_base_path`: caminho do arquivo JSON da base de conhecimento.
-- `category_knowledge_root`: pasta raiz usada para armazenar os documentos de referencia por categoria (auto-criada e monitorada continuamente).
-- `teams_webhook_url`: URL do webhook do Microsoft Teams para envio dos Adaptive Cards (string vazia desativa).
-- `teams_activity_webhook_url`: webhook adicional para alertas de entrada/processamento (pode ser o mesmo canal do card).
-- `storage_root`: raiz onde ficam entrada, processamento, processados, feedback e complex_samples (aceita caminho absoluto).
-- `input_subdir`, `processing_subdir`, `processed_subdir`, `processing_fail_subdir`: subpastas (ou caminhos absolutos) configuraveis para adequar a rede da empresa.
-- `feedback_subdir`, `feedback_processed_subdir`: controlam onde feedbacks chegam e sao arquivados.
-- `complex_samples_subdir`: armazena casos de teste complexos.
-- Todos os parametros podem ser sobrescritos via variaveis de ambiente listadas em `load_config()` (ex.: `CLASSIFIER_POLL_INTERVAL`, `TEAMS_WEBHOOK_URL`). Valores numericos sao convertidos automaticamente.
-- **Criando um `.env` rapidamente (PowerShell)**:
-  ```powershell
-  @"
-  AZURE_OPENAI_ENDPOINT=COLE_SEU_OPENAI_ENPOINT
-  AZURE_OPENAI_KEY=COLE_SUA_CHAVE_AQUI
-  AZURE_OPENAI_DEPLOYMENT=gpt4o-mini
-  OPENAI_API_VERSION=2024-08-01-preview
-  TEAMS_WEBHOOK_URL=https://contoso.webhook.office.com/webhookb2/...
-  USE_AZURE_OPENAI=true
-  "@ | Out-File -FilePath .env -Encoding UTF8
-  ```
-  Ajuste os valores antes de executar. Para ambientes sem PowerShell, crie o arquivo `.env` manualmente com essas chaves.
+## 8. Configuracao e parametros (.env)
+- Toda a configuracao vive no `.env`. Copie `/.env.example` para `.env` e ajuste os valores conforme o ambiente. Nao mantenha valores sensiveis em repositorio.
+
+### 8.1 Modos de armazenamento (`DOC_ANALYZER_STORAGE_MODE`)
+- `relative`: usa `DOC_ANALYZER_STORAGE_RELATIVE_ROOT` como pasta raiz dentro do servidor (ex.: `folders`). Subpastas (`entrada`, `processados`, etc.) sao criadas dentro dela. Ideal para ambientes de teste ou quando o servico controla toda a arvore.
+- `absolute`: ignora a raiz relativa e escreve diretamente em `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` (precisa ser um caminho absoluto local). Use quando a infraestrutura ja oferece a pasta final com permissoes preparadas.
+- `network`: mesmo comportamento de `absolute`, mas sinaliza para a equipe que o caminho aponta para um compartilhamento de rede montado previamente. Combine com os campos de usuario de servico e `DOC_ANALYZER_STORAGE_MOUNT_COMMAND` para documentar o procedimento de montagem.
+
+### 8.2 Variaveis obrigatorias (LLM e pipeline)
+| Variavel | Descricao | Default / exemplo |
+| --- | --- | --- |
+| `DOC_ANALYZER_API_KEY` | Chave da OpenAI (usada tambem como fallback para Azure). | `` |
+| `DOC_ANALYZER_MODEL` | Modelo principal para analise GPT. | `gpt-5` |
+| `DOC_ANALYZER_CROSS_MODEL` | Modelo secundario para validacao cruzada. | `gpt-5` |
+| `DOC_ANALYZER_CONFIDENCE_THRESHOLD` | Confianca minima (0-1) exigida pelo `Validator`. | `0.8` |
+| `DOC_ANALYZER_MAX_RETRIES` | Tentativas adicionais quando a confianca nao atinge o corte. | `3` |
+| `DOC_ANALYZER_TEMPERATURE` | Temperatura aplicada nas chamadas GPT. | `1.0` |
+| `DOC_ANALYZER_REQUEST_TIMEOUT` | Timeout em segundos por chamada GPT. | `60` |
+| `DOC_ANALYZER_POLL_INTERVAL` | Intervalo (s) de varredura da pasta de entrada. | `10` |
+| `DOC_ANALYZER_FEEDBACK_INTERVAL` | Intervalo (s) de varredura da pasta de feedback. | `15` |
+| `DOC_ANALYZER_PROCESSING_WORKERS` | Threads paralelas do `DocumentProcessor`. | `2` |
+| `DOC_ANALYZER_LOG_LEVEL` | Nivel de log (`DEBUG`, `INFO`, etc.). | `INFO` |
+| `DOC_ANALYZER_LOG_FILE` | Caminho do log estruturado (`.jsonl`). | `logs/activity.jsonl` |
+| `DOC_ANALYZER_TEXT_LOG_FILE` | Caminho do log textual. | `logs/system.log` |
+| `DOC_ANALYZER_KNOWLEDGE_BASE_PATH` | Arquivo JSON da base de conhecimento. | `knowledge.json` |
+| `DOC_ANALYZER_CATEGORY_KNOWLEDGE_ROOT` | Pasta com artefatos por categoria. | `knowledge_sources` |
+
+### 8.3 Variaveis de armazenamento e paths
+| Variavel | Descricao | Default / exemplo |
+| --- | --- | --- |
+| `DOC_ANALYZER_STORAGE_MODE` | Modo de resolucao de pastas (`relative`, `absolute`, `network`). | `relative` |
+| `DOC_ANALYZER_STORAGE_RELATIVE_ROOT` | Raiz usada em modo `relative`. | `folders` |
+| `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` | Raiz absoluta para `absolute` ou `network`. | `` |
+| `DOC_ANALYZER_STORAGE_AUTO_CREATE` | Cria automaticamente a estrutura se `true`. | `true` |
+| `DOC_ANALYZER_STORAGE_CREATE_DEFAULT_CATEGORIES` | Gera pastas padrao de categorias se `true`. | `true` |
+| `DOC_ANALYZER_INPUT_SUBDIR` | Pasta de entrada (relativa ou absoluta). | `entrada` |
+| `DOC_ANALYZER_PROCESSING_SUBDIR` | Pasta de processamento ativo. | `em_processamento` |
+| `DOC_ANALYZER_PROCESSING_FAIL_SUBDIR` | Subpasta de falhas internas. | `_falhas` |
+| `DOC_ANALYZER_PROCESSED_SUBDIR` | Pasta de saida (com ZIPs). | `processados` |
+| `DOC_ANALYZER_FEEDBACK_SUBDIR` | Pasta onde chegam feedbacks. | `feedback` |
+| `DOC_ANALYZER_FEEDBACK_PROCESSED_SUBDIR` | Subpasta para feedback tratado. | `processado` |
+| `DOC_ANALYZER_COMPLEX_SAMPLES_SUBDIR` | Repositorio de casos complexos para QA. | `complex_samples` |
+
+### 8.4 Integracoes (Teams e Azure)
+| Variavel | Descricao | Default / exemplo |
+| --- | --- | --- |
+| `DOC_ANALYZER_TEAMS_WEBHOOK_URL` | Webhook para Adaptive Card final (vazio desativa). | `` |
+| `DOC_ANALYZER_TEAMS_ACTIVITY_WEBHOOK_URL` | Webhook para eventos de atividade. | `` |
+| `DOC_ANALYZER_USE_AZURE` | Ativa modo Azure OpenAI (`true`/`false`). | `false` |
+| `DOC_ANALYZER_AZURE_ENDPOINT` | Endpoint completo do recurso Azure. | `https://seu-recurso.openai.azure.com` |
+| `DOC_ANALYZER_AZURE_API_KEY` | Chave do recurso Azure. | `` |
+| `DOC_ANALYZER_AZURE_DEPLOYMENT` | Deployment configurado no Azure. | `` |
+| `DOC_ANALYZER_AZURE_API_VERSION` | Versao da API utilizada. | `2024-02-01` |
+
+### 8.5 Credenciais de rede / montagem (opcional)
+| Variavel | Descricao | Default / exemplo |
+| --- | --- | --- |
+| `DOC_ANALYZER_STORAGE_SERVICE_USER` | Usuario de servico para montar o compartilhamento. | `` |
+| `DOC_ANALYZER_STORAGE_SERVICE_PASSWORD` | Senha do usuario de servico (armazenar em cofre quando possivel). | `` |
+| `DOC_ANALYZER_STORAGE_SERVICE_DOMAIN` | Dominio ou realm do usuario de rede. | `` |
+| `DOC_ANALYZER_STORAGE_MOUNT_COMMAND` | Comando documentado para montar o compartilhamento (ex.: `mount -t cifs ...`). | `` |
+
+### 8.6 Variaveis legadas
+- `OPENAI_API_KEY`, `CLASSIFIER_*`, `TEAMS_WEBHOOK_URL`, `TEAMS_ACTIVITY_WEBHOOK_URL`, `URL_BASE`, `API_KEY`, `DEPLOYMENT_NAME` e similares continuam reconhecidos pela camada de compatibilidade. Em novos ambientes, prefira sempre os nomes `DOC_ANALYZER_*`.
 
 ## 9. Integracao Azure OpenAI
-- Defina `use_azure: true` no `config.json` e informe:
-  - `azure_endpoint`: URL do recurso Azure OpenAI (ex.: `https://seu-recurso.openai.azure.com`).
-  - `azure_api_key`: chave do recurso (pode ser definida via `AZURE_OPENAI_API_KEY`).
-  - `azure_deployment`: nome do deployment do modelo chat (ex.: `gpt-4o-mini` configurado na empresa).
-  - `azure_api_version`: versao da API (padrao `2024-02-01`, ajuste conforme politica interna).
-- Opcionalmente, use as variaveis `USE_AZURE_OPENAI`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_VERSION` e `AZURE_OPENAI_API_KEY` para sobrescrever valores.
-  - Alias suportados: `URL_BASE` (endpoint), `API_KEY` (chave) e `DEPLOYMENT_NAME` (deployment).
-- Quando `use_azure` estiver ativo, `GPTCore` passa a utilizar a classe `AzureOpenAI` do SDK oficial (`openai` >= 1.16) e a chamada `chat.completions.create` com o deployment configurado.
+- Defina `DOC_ANALYZER_USE_AZURE=true` no `.env` e informe:
+  - `DOC_ANALYZER_AZURE_ENDPOINT`: URL do recurso Azure OpenAI (ex.: `https://seu-recurso.openai.azure.com`).
+  - `DOC_ANALYZER_AZURE_API_KEY`: chave do recurso (pode ser compartilhada com `DOC_ANALYZER_API_KEY` se preferir manter uma unica variavel).
+  - `DOC_ANALYZER_AZURE_DEPLOYMENT`: nome do deployment do modelo chat (ex.: `gpt-4o-mini` configurado na empresa).
+  - `DOC_ANALYZER_AZURE_API_VERSION`: versao da API (padrao `2024-02-01`, ajuste conforme politica interna).
+- Variaveis legadas seguem valendo: `USE_AZURE_OPENAI`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_VERSION`, `AZURE_OPENAI_KEY`, `URL_BASE`, `API_KEY`, `DEPLOYMENT_NAME`.
+- Quando o modo Azure estiver ativo, `GPTCore` usa `AzureOpenAI` (SDK `openai` >= 1.16) e faz as chamadas em cima do deployment informado.
 
 ## 10. Manual operacional (usuarios finais)
 - Consultar `docs/manual_operacional.md` para o passo a passo sem comandos (entrada, notificacoes Teams, coleta dos ZIPs e envio de feedback).
 - Inclui orientacao para uso do `tools/feedback_gui.py`, que abre uma janela simples para registrar feedback sem utilizar o terminal.
-- Recomenda-se distribuir o manual em PDF ou wiki interna e criar atalhos para `tools/feedback_gui.py` nas esta√ß√µes da equipe.
+- Recomenda-se distribuir o manual em PDF ou wiki interna e criar atalhos para `tools/feedback_gui.py` nas esta+∫+¡es da equipe.
 
 ## 11. Demonstracao de fluxo end-to-end
 1. Gere amostras: `python tools/create_sample_documents.py --drop-into-entrada`.
@@ -160,7 +196,7 @@ Passo a passo para introduzir uma nova categoria principal:
 
 ## 12. Tecnologias e dependencias
 - Python 3.11+ (recomendado) com bibliotecas opcionais: `PyMuPDF (fitz)`, `python-docx`. Sem elas, PDFs/DOCX nao sao processados.
-- OpenAI ou Azure OpenAI (modelos chat) configuraveis via `config.json`.
+- OpenAI ou Azure OpenAI (modelos chat) configuraveis via `.env`.
 - Adaptive Cards (Microsoft Teams) a necessita apenas do webhook; nenhuma SDK adicional foi utilizada (envio via `urllib.request`).
 - Logs estruturados em JSON (compativeis com observabilidade centralizada) e arquivos de texto para auditoria rapida.
 
@@ -173,3 +209,42 @@ Passo a passo para introduzir uma nova categoria principal:
 - **Monitoramento**: utilize `logs/activity.jsonl` para integrar com dashboards (cada linha e um JSON independente). O campo `records` do evento `processing_timeline_summary` lista duracao de todas as etapas.
 - **Extensoes futuras**: para novos tipos de arquivo, adicione a extensao em `SUPPORTED_EXTENSIONS` e implemente o metodo `_read_<ext>()`; para novas notificacoes, estenda `TeamsNotifier` ou crie novos notifiers seguindo a mesma interface (`send_analysis_summary`). 
 - **Configuracao de credenciais**: antes de rodar em producao, defina as variaveis de ambiente (ou um `.env`) com as chaves reais (`AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_KEY`, `AZURE_OPENAI_DEPLOYMENT`, `OPENAI_API_VERSION`, `TEAMS_WEBHOOK_URL`, etc.).
+## 14. Guia de operacao para a equipe (ferias)
+
+### 14.1 Checklist de preparacao
+1. Atualize o repositorio local: `git fetch origin` e `git checkout feature/centralize-env` (ou crie um clone novo a partir dessa branch).
+2. Crie/ative um virtualenv (`python -m venv .venv` e `.\venv\Scripts\activate` no Windows ou `source .venv/bin/activate` no Linux).
+3. Instale dependencias: `pip install -r requirements.txt` (repita em producao sempre que o arquivo mudar).
+4. Copie `/.env.example` para `.env` e preencha cada variavel seguindo a tabela da secao 8. Guarde o arquivo real fora do Git (Ansible, KeyVault, secrets manager, etc.).
+5. Se `DOC_ANALYZER_STORAGE_MODE` for `absolute` ou `network`, garanta que o caminho informado exista e tenha permissao de escrita para o usuario do servico. Documente o comando de montagem no campo `DOC_ANALYZER_STORAGE_MOUNT_COMMAND`.
+6. Confirme conectividade com a OpenAI/Azure executando `python test_run.py` (o primeiro ciclo ja valida as credenciais). Se preferir algo mais rapido, utilize `python -c "from core.settings import load_settings; from core.gpt_core import GPTCore; from core.knowledge_base import KnowledgeBase; s = load_settings(); GPTCore(s.to_dict(), KnowledgeBase(s.knowledge_base_path, s.category_knowledge_root)).ensure_available(); print(\"ok\")"`.
+7. Valide os webhooks do Teams com um `curl -X POST <url> -d '{"text":"ping"}'` para evitar surpresas na hora do deploy.
+8. Tenha pelo menos um documento de teste em `samples/` e use o script `tools/create_sample_documents.py --drop-into-entrada` para gerar amostras sempre que precisar validar o fluxo completo.
+
+### 14.2 Como testar antes da liberacao
+- **Lint sintatico rapido**: `python -m compileall core main.py tools/create_sample_documents.py`.
+- **Smoke test do pipeline**: defina `CLASSIFIER_TEST_DURATION=30` e execute `python test_run.py`. Verifique se arquivos entram/saem das pastas configuradas e se os logs registram `processing_timeline_summary` sem erros.
+- **Teste com amostra real**: solte um PDF/DOCX na pasta de entrada configurada e acompanhe a movimentacao ate `processados/<categoria>/`. Abra o ZIP e confira `analise.txt` e `feedback.txt`.
+- **Feedback round-trip**: preencha o `feedback.txt`, salve na pasta de feedback e confirme se o item aparece em `feedback/processado/` e se a base (`knowledge.json`) recebeu o ajuste.
+- **Notificacoes Teams**: apos o smoke test, abra o canal configurado e confirme o recebimento dos Adaptive Cards. Em caso de erro, o log `system.log` trara a mensagem `Falha ao enviar notificacao Teams`.
+- **Integracao Azure**: quando `DOC_ANALYZER_USE_AZURE=true`, execute `python - <<"PY"` carregando `from core.settings import load_settings; from core.gpt_core import GPTCore` para validar `gpt_core.ensure_available()` antes do deploy.
+
+### 14.3 Rotina diaria de operacao
+- Monitorar `logs/system.log` (erros) e `logs/activity.jsonl` (eventos) ñ importar o JSONL em dashboards ajuda a rastrear gargalos e taxa de sucesso.
+- Conferir a fila de `em_processamento` a cada inicio de turno; se houver arquivos presos, abra o log e verifique o ultimo evento (`processing_internal_error`, `taxonomy_refinement`, etc.).
+- Validar que os webhooks continuam ativos (os Teams Cards mostram o ID do processo e o caminho gerado; se sumirem, revisar secret ou firewall).
+- Revisar `folders/em_processamento/_falhas` diariamente. Itens nessa pasta precisam de tratamento manual; depois de corrigir, mova o arquivo de volta para `entrada`.
+- Atualizar a base de conhecimento com feedback positivo relevante: confirme se os trechos gerados em `knowledge_sources/<categoria>/feedback_*.txt` fazem sentido e arquive os redundantes.
+
+### 14.4 Ajustes frequentes
+- **Trocar path de saida**: ajuste `DOC_ANALYZER_STORAGE_MODE` e atualize `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` ou `DOC_ANALYZER_STORAGE_RELATIVE_ROOT`. Rode `python test_run.py` para validar permissoes antes de voltar ao modo daemon.
+- **Alterar frequencia de polling**: modifique `DOC_ANALYZER_POLL_INTERVAL` ou `DOC_ANALYZER_FEEDBACK_INTERVAL` (segundos). Valores muito baixos (<5s) podem gerar carga desnecessaria em discos de rede.
+- **Aumentar throughput**: eleve `DOC_ANALYZER_PROCESSING_WORKERS`. Sempre monitore CPU/RAM do servidor e ajuste o limite conforme a margem disponivel.
+- **Novo webhook/ambiente**: atualize `DOC_ANALYZER_TEAMS_WEBHOOK_URL` e `DOC_ANALYZER_TEAMS_ACTIVITY_WEBHOOK_URL`, reinicie o servico (`Ctrl+C` + `python main.py`) e valide com um documento de teste.
+- **Credenciais rotacionadas**: substitua a chave no `.env`, reinicie o processo e acompanhe o log inicial (`GPTCore configurado...`). Se estiver usando Azure Key Vault, mantenha a URL em `DOC_ANALYZER_AZURE_KEYVAULT_URL` (variavel opcional) para future hooks.
+
+### 14.5 Fallbacks rapidos
+- **GPT indisponivel**: o watcher move o arquivo de volta para `entrada` e registra `gpt_indisponivel`. Mantenha um plano B (ex.: acionar o time para usar o modo manual de classificacao) e tente novamente apos confirmar status da API.
+- **Compartilhamento inacessivel**: use o comando documentado em `DOC_ANALYZER_STORAGE_MOUNT_COMMAND` para remontar. Se precisar, utilize `net use` (Windows) ou `mount -t cifs` (Linux) com as credenciais `DOC_ANALYZER_STORAGE_SERVICE_*`.
+- **Erro persistente em documento especifico**: mova o arquivo para `complex_samples` com um sufixo de data, registre o erro e avance com os proximos. Posteriormente trate o caso manualmente ou ajuste heuristicas/taxonomia conforme necessidade.
+

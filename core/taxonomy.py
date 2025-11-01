@@ -10,7 +10,7 @@ def _normalize_text(value: str) -> str:
 
 
 class TaxonomyRuleEngine:
-    """Rule-based reinforcement layer to augment GPT and knowledge-base decisions."""
+    """Camada de regras para eu puxar o resultado pro lado certo quando o GPT ou a base ficam na d+vida."""
 
     def __init__(self) -> None:
         self.category_profiles: Dict[str, Dict] = {

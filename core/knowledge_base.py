@@ -106,7 +106,7 @@ def _slugify_category_name(value: str) -> str:
 
 @dataclass
 class KnowledgeEntry:
-    """Dataclass representing an entry in the knowledge base."""
+    """Registro completo na base de conhecimento com os metadados que eu preciso reaproveitar depois."""
 
     id: str
     file_name: str
@@ -139,7 +139,7 @@ class KnowledgeEntry:
 
 
 class KnowledgeBase:
-    """Manages knowledge persistence and lightweight semantic similarity support."""
+    """Persisto e organizo a base de conhecimento, cuidando das categorias e da similaridade sem depender de um banco externo."""
 
     def __init__(self, path: str, category_root: Optional[str] = None):
         self.path = Path(path)
@@ -205,7 +205,7 @@ class KnowledgeBase:
                 if isinstance(data, dict):
                     return data
         except json.JSONDecodeError:
-            logging.warning("Arquivo de metadados inválido em %s. Será recriado.", meta_path)
+            logging.warning("Arquivo de metadados inv+ilido em %s. Ser+i recriado.", meta_path)
         return {}
 
     def _empty_category_doc_state(self) -> Dict:
@@ -385,7 +385,7 @@ class KnowledgeBase:
             return None
         if text in {"true", "1", "yes", "sim", "y", "s"}:
             return True
-        if text in {"false", "0", "no", "nao", "não", "n"}:
+        if text in {"false", "0", "no", "nao", "n+uo", "n"}:
             return False
         return None
 
@@ -418,7 +418,7 @@ class KnowledgeBase:
                 new_weight = round(cat_keywords.get(token, 0.0) + 1.0, 4)
                 cat_keywords[token] = new_weight
                 logging.info(
-                    "Palavra-chave %s reforçada manualmente para categoria %s (peso=%.2f).",
+                    "Palavra-chave %s refor+oada manualmente para categoria %s (peso=%.2f).",
                     token,
                     category,
                     new_weight,
@@ -543,7 +543,7 @@ class KnowledgeBase:
         if suffix == ".pdf":
             if fitz is None:
                 logging.error(
-                    "PyMuPDF (fitz) não está instalado. Ignorando arquivo PDF de conhecimento: %s",
+                    "PyMuPDF (fitz) n+uo est+i instalado. Ignorando arquivo PDF de conhecimento: %s",
                     path,
                 )
                 return ""
@@ -556,7 +556,7 @@ class KnowledgeBase:
         if suffix == ".docx":
             if Document is None:
                 logging.error(
-                    "python-docx não está instalado. Ignorando arquivo DOCX de conhecimento: %s",
+                    "python-docx n+uo est+i instalado. Ignorando arquivo DOCX de conhecimento: %s",
                     path,
                 )
                 return ""
@@ -567,7 +567,7 @@ class KnowledgeBase:
                 logging.error("Erro ao extrair texto de DOCX %s: %s", path, exc)
                 return ""
         logging.warning(
-            "Extensão %s não suportada para conhecimento documental (%s).",
+            "Extens+uo %s n+uo suportada para conhecimento documental (%s).",
             suffix,
             path,
         )
@@ -576,7 +576,7 @@ class KnowledgeBase:
     def _scan_category_directory(self, category: str, directory: Path) -> bool:
         if not directory.exists():
             logging.warning(
-                "Pasta de conhecimento %s não encontrada para categoria %s.",
+                "Pasta de conhecimento %s n+uo encontrada para categoria %s.",
                 directory,
                 category,
             )
@@ -600,14 +600,14 @@ class KnowledgeBase:
             text = self._load_document_text(file_path)
             if not text.strip():
                 logging.warning(
-                    "Arquivo de conhecimento %s está vazio ou sem texto relevante.",
+                    "Arquivo de conhecimento %s est+i vazio ou sem texto relevante.",
                     file_path,
                 )
                 continue
             tokens = _tokens_from_text(text, limit=120)
             if not tokens:
                 logging.warning(
-                    "Não foi possível derivar tokens para conhecimento %s. Arquivo ignorado.",
+                    "N+uo foi poss+vel derivar tokens para conhecimento %s. Arquivo ignorado.",
                     file_path,
                 )
                 continue
@@ -699,7 +699,7 @@ class KnowledgeBase:
             ]
             for category in obsolete:
                 logging.warning(
-                    "Pasta de conhecimento para categoria %s não encontrada. Removendo associação.",
+                    "Pasta de conhecimento para categoria %s n+uo encontrada. Removendo associa+o+uo.",
                     category,
                 )
                 mapping.pop(category, None)
@@ -938,7 +938,7 @@ class KnowledgeBase:
                 stats["confidence_sum"] += confidence_ratio * 100.0
                 stats["confidence_count"] += 1
                 logging.info(
-                    "Confiança ajustada manualmente para %s -> %.2f%%",
+                    "Confian+oa ajustada manualmente para %s -> %.2f%%",
                     file_name,
                     confidence_ratio * 100.0,
                 )
@@ -986,7 +986,7 @@ class KnowledgeBase:
                 stats["reprocess_requests"] += 1
                 target_entry["needs_reprocess"] = True
                 logging.info(
-                    "Documento %s marcado para reanálise futura (categoria %s).",
+                    "Documento %s marcado para rean+ilise futura (categoria %s).",
                     file_name,
                     category_after,
                 )
@@ -1074,11 +1074,11 @@ class KnowledgeBase:
             self._data.setdefault("feedback_history", []).append(history_item)
             self._write()
             logging.info(
-                "Feedback registrado para %s (status=%s, categoria=%s). Observações: %s",
+                "Feedback registrado para %s (status=%s, categoria=%s). Observa+o+Aes: %s",
                 file_name,
                 normalized_status,
                 category_after,
-                observations or "sem observações",
+                observations or "sem observa+o+Aes",
             )
             return target_entry
 
