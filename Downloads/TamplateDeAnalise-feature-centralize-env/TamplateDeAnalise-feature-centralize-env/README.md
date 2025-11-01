@@ -143,6 +143,8 @@ DOC_ANALYZER_LOG_FILE=logs/activity.jsonl
 DOC_ANALYZER_TEXT_LOG_FILE=logs/system.log
 DOC_ANALYZER_KNOWLEDGE_BASE_PATH=knowledge.json
 DOC_ANALYZER_CATEGORY_KNOWLEDGE_ROOT=knowledge_sources
+DOC_ANALYZER_KNOWLEDGE_REFRESH_ON_STARTUP=true
+DOC_ANALYZER_KNOWLEDGE_REFRESH_INTERVAL=300
 DOC_ANALYZER_STORAGE_MODE=relative
 DOC_ANALYZER_STORAGE_RELATIVE_ROOT=folders
 DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT=
@@ -226,6 +228,8 @@ Depois de criar o arquivo, preencha os campos marcados como TODO no proprio temp
 | `DOC_ANALYZER_SECONDARY_STRUCT_THRESHOLD` | Corte (0-1) para sugerir categorias secundarias com base na base estruturada. | `0.4` |
 | `DOC_ANALYZER_SECONDARY_DOC_THRESHOLD` | Corte (0-1) para sugerir categorias secundarias com base em similares reais. | `0.45` |
 | `DOC_ANALYZER_SECONDARY_STRONG_THRESHOLD` | Corte (0-1) para consolidar categorias secundarias fortes (matches/documentos). | `0.8` |
+| `DOC_ANALYZER_KNOWLEDGE_REFRESH_ON_STARTUP` | Atualiza as pastas de conhecimento assim que o servico inicia. | `true` |
+| `DOC_ANALYZER_KNOWLEDGE_REFRESH_INTERVAL` | Intervalo em segundos para reprocessar automaticamente as pastas (0 desativa). | `0` |
 | `DOC_ANALYZER_LOG_LEVEL` | Nivel de log (`DEBUG`, `INFO`, etc.). | `INFO` |
 | `DOC_ANALYZER_LOG_FILE` | Caminho do log estruturado (JSONL). | `logs/activity.jsonl` |
 | `DOC_ANALYZER_TEXT_LOG_FILE` | Caminho do log textual. | `logs/system.log` |
