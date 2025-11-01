@@ -26,6 +26,7 @@
 1. Preencher o arquivo `feedback.txt` (campos obrigatorios indicados no template).
 2. Salvar na pasta de feedback. O sistema processa automaticamente e move para `feedback/processado/`.
 3. Entradas aprovadas viram evidencias em `knowledge_sources/<categoria>/feedback_*.txt`.
+4. Ajuste quando categorias secundarias aparecem modificando os cortes `DOC_ANALYZER_SECONDARY_STRUCT_THRESHOLD`, `DOC_ANALYZER_SECONDARY_DOC_THRESHOLD` e `DOC_ANALYZER_SECONDARY_STRONG_THRESHOLD` no `.env` (0 a 1).
 
 ## 6. Ajuste rapido de caminhos
 - `DOC_ANALYZER_STORAGE_MODE=relative`: usa `<repo>/<DOC_ANALYZER_STORAGE_RELATIVE_ROOT>`.

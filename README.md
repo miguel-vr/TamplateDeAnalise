@@ -38,6 +38,7 @@
 3. **Analise GPT** (`analise_gpt`): `GPTCore` gera classificacao, resumo tematico, motivos-chave e riscos. Falhas no servico retornam o arquivo para a pasta de entrada.
 4. **Validacao** (`validacao`): `Validator` garante que a confianca atinga o limiar (`confidence_threshold`). Caso necessario, reforca a analise com tentativas adicionais.
 5. **Refinamento heuristico** (`refinamento_taxonomia`): `TaxonomyRuleEngine` pontua categorias pelo texto bruto, promove categorias existentes (ou sugere nova como `recursos humanos / saude ocupacional`), recalcula confianca composta e publica o relatorio `taxonomy_report`.
+   - Os cortes de similaridade que autorizam categorias secundarias (matches estruturados, documentos reais e sugestoes fortes) podem ser ajustados via `DOC_ANALYZER_SECONDARY_*_THRESHOLD`.
 6. **Resolucao de categoria** (`resolucao_categoria`): cria a pasta de destino caso ainda nao exista e registra evento `category_folder_created` quando aplicavel.
 7. **Geracao de pacote** (`geracao_pacote`): cria um ZIP contendo documento original, relatorio `analise.txt` (com todos os metadados, matches, heuristica) e um formulario de feedback `feedback.txt` atualizado.
 8. **Atualizacao da base** (`atualizacao_conhecimento`): grava a entrada na `KnowledgeBase`, reforca palavras-chave de alta confianca e registra `knowledge_entry_added`.
@@ -219,12 +220,14 @@ Depois de criar o arquivo, preencha os campos marcados como TODO no proprio temp
 | `DOC_ANALYZER_POLL_INTERVAL` | Intervalo (s) de varredura da pasta de entrada. | `10` |
 | `DOC_ANALYZER_FEEDBACK_INTERVAL` | Intervalo (s) de varredura da pasta de feedback. | `15` |
 | `DOC_ANALYZER_PROCESSING_WORKERS` | Threads paralelas do `DocumentProcessor`. | `2` |
+| `DOC_ANALYZER_SECONDARY_STRUCT_THRESHOLD` | Corte (0-1) para sugerir categorias secundarias com base na base estruturada. | `0.4` |
+| `DOC_ANALYZER_SECONDARY_DOC_THRESHOLD` | Corte (0-1) para sugerir categorias secundarias com base em similares reais. | `0.45` |
+| `DOC_ANALYZER_SECONDARY_STRONG_THRESHOLD` | Corte (0-1) para consolidar categorias secundarias fortes (matches/documentos). | `0.8` |
 | `DOC_ANALYZER_LOG_LEVEL` | Nivel de log (`DEBUG`, `INFO`, etc.). | `INFO` |
 | `DOC_ANALYZER_LOG_FILE` | Caminho do log estruturado (JSONL). | `logs/activity.jsonl` |
 | `DOC_ANALYZER_TEXT_LOG_FILE` | Caminho do log textual. | `logs/system.log` |
 | `DOC_ANALYZER_KNOWLEDGE_BASE_PATH` | Arquivo JSON da base de conhecimento. | `knowledge.json` |
 | `DOC_ANALYZER_CATEGORY_KNOWLEDGE_ROOT` | Pasta com artefatos por categoria. | `knowledge_sources` |
-
 ### 8.3 Subpastas e estrutura interna
 | Variavel | Descricao | Default / exemplo |
 | --- | --- | --- |
