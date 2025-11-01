@@ -1,8 +1,9 @@
 import difflib
-import os
-import unicodedata
 import json
 import logging
+import os
+import re
+import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.knowledge_base import KnowledgeBase
@@ -12,6 +13,11 @@ def _normalize_category_name(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value or "")
     stripped = "".join(ch for ch in normalized if ch.isalnum() or ch.isspace())
     return stripped.lower().strip()
+
+
+def _strip_accents(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value or "")
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
 
 
 class GPTServiceUnavailable(Exception):
@@ -666,6 +672,108 @@ class GPTCore:
     # -------------------------------------------------------------------------
     # Response Parsing and Combination
     # -------------------------------------------------------------------------
+    def _extract_json_payload(self, content: str) -> str:
+        text = content.strip()
+        if not text:
+            return text
+        fenced_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text, flags=re.IGNORECASE)
+        if fenced_match:
+            return fenced_match.group(1).strip()
+        match = re.search(r"\{[\s\S]*\}", text)
+        if match:
+            return match.group(0).strip()
+        return text
+
+    def _coerce_structured_response(self, raw: str) -> Optional[Dict[str, Any]]:
+        if not raw:
+            return None
+        lines = [line.strip(" -*\t") for line in raw.splitlines() if line.strip()]
+        if not lines:
+            return None
+
+        ascii_lines = [_strip_accents(line).lower() for line in lines]
+
+        def find_value(prefixes: Tuple[str, ...]) -> Optional[str]:
+            for idx, normalized in enumerate(ascii_lines):
+                for prefix in prefixes:
+                    if normalized.startswith(prefix):
+                        original = lines[idx]
+                        if ":" in original:
+                            return original.split(":", 1)[1].strip()
+                        if " - " in original:
+                            return original.split(" - ", 1)[1].strip()
+                        return original[len(prefix) :].strip(" :-")
+            return None
+
+        result: Dict[str, Any] = {}
+        category_value = find_value(("categoria",))
+        if category_value:
+            result["categoria_principal"] = category_value
+        theme_value = find_value(("tema", "assunto"))
+        if theme_value:
+            result["tema"] = theme_value
+        secondary_value = find_value(
+            (
+                "areas secundarias",
+                "areas secundarias relacionadas",
+                "area secundaria",
+            )
+        )
+        if secondary_value is not None:
+            if "nao ha" in _strip_accents(secondary_value).lower():
+                result["areas_secundarias"] = []
+            else:
+                areas = re.split(r",|;|\s+e\s+", secondary_value)
+                cleaned = [area.strip() for area in areas if area.strip()]
+                result["areas_secundarias"] = cleaned
+        confidence_value = find_value(("confianca", "nivel de confianca"))
+        if confidence_value:
+            match = re.search(r"(\d+(?:[.,]\d+)?)", confidence_value)
+            if match:
+                try:
+                    value = float(match.group(1).replace(",", "."))
+                    if value <= 1:
+                        value *= 100.0
+                    result["confianca"] = value
+                except ValueError:
+                    pass
+
+        reasons: List[str] = []
+        capture = False
+        for line in raw.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                if capture and reasons:
+                    break
+                continue
+            normalized = _strip_accents(stripped).lower()
+            if normalized.startswith("motivos chave") or normalized.startswith("motivos principais"):
+                capture = True
+                continue
+            if capture:
+                if any(normalized.startswith(prefix) for prefix in ("categoria", "tema", "areas", "confianca")):
+                    break
+                if re.match(r"^\d+[\).\-\s]+", stripped):
+                    item = re.sub(r"^\d+[\).\-\s]+", "", stripped).strip()
+                    if item:
+                        reasons.append(item)
+                    continue
+                if stripped.startswith(("-", "•", "*")):
+                    item = stripped.lstrip("-•* ").strip()
+                    if item:
+                        reasons.append(item)
+                    continue
+                if reasons:
+                    reasons[-1] = f"{reasons[-1]} {stripped}"
+        if reasons:
+            result["motivos_chave"] = reasons
+
+        if result:
+            if "justificativa" not in result:
+                result["justificativa"] = raw.strip()
+            return result
+        return None
+
     def _parse_response(self, response, fallback: Optional[Dict] = None) -> Dict:
         if not response:
             return fallback or {}
@@ -674,12 +782,33 @@ class GPTCore:
             content = self._extract_content_text(response)
             if not content:
                 raise ValueError("conteudo vazio")
-            data = json.loads(content)
+            payload = self._extract_json_payload(content)
+            data = json.loads(payload)
+            if isinstance(fallback, dict) and fallback:
+                merged = dict(fallback)
+                merged.update(data)
+                return merged
             return data
         except (KeyError, AttributeError, json.JSONDecodeError) as exc:
+            heuristics = self._coerce_structured_response(content)
+            if heuristics:
+                logging.warning("Heuristically parsed GPT response after JSON error (%s).", exc)
+                base: Dict[str, Any] = {}
+                if isinstance(fallback, dict) and fallback:
+                    base = dict(fallback)
+                base.update(heuristics)
+                return base
             logging.error("Failed to parse GPT response. Error: %s | raw=%r", exc, content)
             return fallback or {}
         except ValueError as exc:
+            heuristics = self._coerce_structured_response(content)
+            if heuristics:
+                logging.warning("Heuristically parsed GPT response after value error (%s).", exc)
+                base: Dict[str, Any] = {}
+                if isinstance(fallback, dict) and fallback:
+                    base = dict(fallback)
+                base.update(heuristics)
+                return base
             logging.error("Failed to parse GPT response. Error: %s | raw=%r", exc, content)
             return fallback or {}
 
