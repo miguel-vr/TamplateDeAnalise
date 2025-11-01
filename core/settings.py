@@ -58,6 +58,9 @@ class Settings:
     polling_interval: int = 10
     feedback_polling_interval: int = 10
     processing_workers: int = 2
+    secondary_structured_threshold: float = 0.4
+    secondary_document_threshold: float = 0.45
+    secondary_strong_threshold: float = 0.8
     log_level: str = "INFO"
     log_file: str = "logs/activity.jsonl"
     text_log_file: str = "logs/system.log"
@@ -131,6 +134,18 @@ ENV_ALIASES: Dict[str, Iterable[str]] = {
     "polling_interval": (
         "DOC_ANALYZER_POLL_INTERVAL",
         "CLASSIFIER_POLL_INTERVAL",
+    ),
+    "secondary_structured_threshold": (
+        "DOC_ANALYZER_SECONDARY_STRUCT_THRESHOLD",
+        "CLASSIFIER_SECONDARY_STRUCT_THRESHOLD",
+    ),
+    "secondary_document_threshold": (
+        "DOC_ANALYZER_SECONDARY_DOC_THRESHOLD",
+        "CLASSIFIER_SECONDARY_DOC_THRESHOLD",
+    ),
+    "secondary_strong_threshold": (
+        "DOC_ANALYZER_SECONDARY_STRONG_THRESHOLD",
+        "CLASSIFIER_SECONDARY_STRONG_THRESHOLD",
     ),
     "feedback_polling_interval": (
         "DOC_ANALYZER_FEEDBACK_INTERVAL",

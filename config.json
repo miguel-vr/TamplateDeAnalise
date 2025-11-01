@@ -1,4 +1,4 @@
-{
+﻿{
   "api_key": "",
   "model": "gpt-5",
   "confidence_threshold": 0.8,
@@ -7,6 +7,9 @@
   "log_file": "logs/activity.jsonl",
   "text_log_file": "logs/system.log",
   "max_retries": 3,
+  "secondary_structured_threshold": 0.4,
+  "secondary_document_threshold": 0.45,
+  "secondary_strong_threshold": 0.8,
   "teams_activity_webhook_url": "",
   "cross_validation_model": "gpt-5",
   "knowledge_base_path": "knowledge.json",

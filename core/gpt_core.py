@@ -65,6 +65,18 @@ class GPTCore:
             or os.getenv("USE_AZURE_OPENAI")
             or self.azure_endpoint
         )
+        try:
+            self.secondary_structured_threshold = float(config.get("secondary_structured_threshold", 0.4))
+        except (TypeError, ValueError):
+            self.secondary_structured_threshold = 0.4
+        try:
+            self.secondary_document_threshold = float(config.get("secondary_document_threshold", 0.45))
+        except (TypeError, ValueError):
+            self.secondary_document_threshold = 0.45
+        try:
+            self.secondary_strong_threshold = float(config.get("secondary_strong_threshold", 0.8))
+        except (TypeError, ValueError):
+            self.secondary_strong_threshold = 0.8
 
         if self.azure_enabled:
             if AzureOpenAI is None:
@@ -776,11 +788,11 @@ class GPTCore:
         strong_suggestions: List[Tuple[str, float]] = []
         for match in knowledge_matches:
             score = match.get("best_match", 0.0)
-            if score >= 0.8:
+            if score >= self.secondary_strong_threshold:
                 strong_suggestions.append((self._resolve_category_alias(match["category"], known_categories), score))
         for match in document_matches:
             score = match.get("score", 0.0)
-            if score >= 0.8:
+            if score >= self.secondary_strong_threshold:
                 strong_suggestions.append((self._resolve_category_alias(match["category"], known_categories), score))
         if strong_suggestions:
             unique_strong: Dict[str, float] = {}
@@ -802,13 +814,13 @@ class GPTCore:
 
         secondary_candidates: List[Tuple[str, str, float]] = []
         for match in knowledge_matches:
-            if match["category"] == primary_category or match.get("best_match", 0.0) < 0.4:
+            if match["category"] == primary_category or match.get("best_match", 0.0) < self.secondary_structured_threshold:
                 continue
             resolved_secondary = self._resolve_category_alias(match["category"], known_categories)
             if resolved_secondary and resolved_secondary != primary_category:
                 secondary_candidates.append((resolved_secondary, "base estruturada", match["best_match"]))
         for match in document_matches:
-            if match["category"] == primary_category or match.get("score", 0.0) < 0.45:
+            if match["category"] == primary_category or match.get("score", 0.0) < self.secondary_document_threshold:
                 continue
             resolved_secondary = self._resolve_category_alias(match["category"], known_categories)
             if resolved_secondary and resolved_secondary != primary_category:
