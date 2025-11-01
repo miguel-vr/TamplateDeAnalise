@@ -17,7 +17,7 @@
 - **Watchers**
   - `core/watcher.DirectoryWatcher`: thread de polling generica que dispara callbacks por arquivo.
   - `core/watcher.IntakeWatcher`: move arquivos da pasta de entrada para `folders/em_processamento`, registra estado da fila e aciona o `DocumentProcessor` em paralelo (executor configuravel).
-  - `core/watcher.FeedbackWatcher`: interpreta feedbacks (`.json` ou `.txt`), normaliza campos (`documento`, `status`, `nova_categoria`, `observacoes`), processa confirma+º+Áes/evid+¬ncias por categoria e arquiva tanto o formul+írio quanto os trechos aprovados em `knowledge_sources/<categoria>/feedback_*.txt`.
+  - `core/watcher.FeedbackWatcher`: interpreta feedbacks (`.json` ou `.txt`), normaliza campos (`documento`, `status`, `nova_categoria`, `observacoes`), processa confirma++es/evid+ncias por categoria e arquiva tanto o formul+rio quanto os trechos aprovados em `knowledge_sources/<categoria>/feedback_*.txt`.
 - **Pipeline de processamento**
   - `core/processor.DocumentProcessor`: encapsula todo o fluxo. Cada etapa gera eventos via `_ProcessingTimeline`, inclui metricas de duracao, aciona heuristicas, atualiza a base e dispara notificacoes.
   - `core/taxonomy.TaxonomyRuleEngine`: calcula scores de palavras-chave por categoria, ajusta classificacoes (promocao/reducao) e gera composicao de confianca (LLM + heuristica + conhecimento).
@@ -50,7 +50,7 @@
 ### Base documental por categoria
 - O diretorio configurado em `category_knowledge_root` (padrao `knowledge_sources/`) armazena pastas por categoria com documentos reais ja validados pelo time.
 - `KnowledgeBase.refresh_category_documents()` monitora essas pastas, calcula hash para evitar reprocessar arquivos e extrai termos caracteristicos por categoria; cada atualizacao e registrada em log.
-- Durante a analise, `GPTCore` injeta esse vocabul+írio nos prompts (primario, auditoria e I3) e adiciona uma camada de validacao `document_knowledge` que ajusta categorias, areas secundarias e confianca final.
+- Durante a analise, `GPTCore` injeta esse vocabul+rio nos prompts (primario, auditoria e I3) e adiciona uma camada de validacao `document_knowledge` que ajusta categorias, areas secundarias e confianca final.
 - Novas categorias sao provisionadas automaticamente (pasta + `category.json`) quando o pipeline consolida uma classificacao principal ou secundaria inedita; tambem e possivel criar a pasta manualmente e ela sera absorvida no proximo refresh.
 - Para validacao manual, um documento por categoria foi colocado em `knowledge_sources/` (contabilidade, tecnologia, tesouraria) e outros dois exemplos por categoria estao em `samples/` para testes do usuario.
 
@@ -59,12 +59,12 @@ Passo a passo para introduzir uma nova categoria principal:
 2. Adicione ao menos um documento ja validado para essa categoria (TXT, PDF ou DOCX). Os arquivos podem ser adicionados gradualmente; apenas os novos sao processados a cada varredura.
 3. Execute o pipeline (`python main.py`). A camada documental sera atualizada nos logs (`KnowledgeBase.refresh_category_documents`), exibindo hashes, termos extraidos e contadores de documentos.
 4. Caso o GPT identifique essa categoria como principal ou secundaria, a pasta correspondente em `folders/processados/` sera criada automaticamente e o feedback template passara a sugerir o mesmo nome.
-5. (Opcional) Para pre-treinar sem novos documentos de entrada, execute `python main.py` ap+¦s adicionar os arquivos a `knowledge_sources/`; o scan inicial popula o vocabul+írio e fica disponivel para futuras decis+Áes.
+5. (Opcional) Para pre-treinar sem novos documentos de entrada, execute `python main.py` ap+s adicionar os arquivos a `knowledge_sources/`; o scan inicial popula o vocabul+rio e fica disponivel para futuras decis+es.
 
 ### Feedback inteligente e aprendizado continuo
 - O template `feedback.txt` agora contem campos explicitos (`status`, `confianca_revisada`, `areas_secundarias`, `motivos_relevantes`, `motivos_criticos`, `palavras_relevantes`, `palavras_irrelevantes`, `aprovar_para_conhecimento`, `marcar_reanalise`, `categoria_feedback`, `observacoes`). Separe listas por virgula.
 - O watcher `FeedbackWatcher` interpreta esses campos, armazena o feedback detalhado e ajusta dinamicamente: contagens de aprovacao/rejeicao, listas de palavras reforcadas/removidas, pedidos de reanalise e aprovacoes para a base documental.
-- Ajustes positivos elevam a confianca final (at+® +0,03) enquanto rejeicoes ou multiplos pedidos de reprocessamento reduzem a nota (ate -0,05). Esses deltas sao registrados em `feedback_adjustment_details` e exibidos na analise.
+- Ajustes positivos elevam a confianca final (at+ +0,03) enquanto rejeicoes ou multiplos pedidos de reprocessamento reduzem a nota (ate -0,05). Esses deltas sao registrados em `feedback_adjustment_details` e exibidos na analise.
 - Cada feedback processado e arquivado em `folders/feedback/processado/<categoria>/`, facilitando auditoria historica.
 - Campos `palavras_relevantes` e `palavras_irrelevantes` alteram imediatamente o dicionario de palavras-chave da categoria; os logs listam as entradas adicionadas ou removidas.
 - Quando `marcar_reanalise: sim`, o registro permanece marcado para reforco em futuras execucoes; `aprovar_para_conhecimento: sim` sinaliza que o arquivo pode ser incorporado a `knowledge_sources/` sem passos adicionais.
@@ -85,7 +85,7 @@ Passo a passo para introduzir uma nova categoria principal:
   - Feedbacks aplicados (ou rejeitados) com identificacao do documento.
 
 ## 6. Notificacoes via Microsoft Teams
-- Configure `DOC_ANALYZER_TEAMS_WEBHOOK_URL` e `DOC_ANALYZER_TEAMS_ACTIVITY_WEBHOOK_URL` no `.env` (vari+íveis legadas `TEAMS_WEBHOOK_URL` e `TEAMS_ACTIVITY_WEBHOOK_URL` ainda funcionam).
+- Configure `DOC_ANALYZER_TEAMS_WEBHOOK_URL` e `DOC_ANALYZER_TEAMS_ACTIVITY_WEBHOOK_URL` no `.env` (vari+veis legadas `TEAMS_WEBHOOK_URL` e `TEAMS_ACTIVITY_WEBHOOK_URL` ainda funcionam).
 - Cada analise concluida envia um Adaptive Card contendo:
   - nome do arquivo, categoria, confianca, caminho do ZIP;
   - resumo das etapas com duracao (linha do tempo);
@@ -95,35 +95,89 @@ Passo a passo para introduzir uma nova categoria principal:
 - Logs registram qualquer falha ao enviar o card (`Falha ao enviar notificacao Teams`). Nenhum erro bloqueia o pipeline.
 
 ## 7. Feedback colaborativo
-- `feedback.txt` agora orienta a revis+úo com perguntas diretas:
+- `feedback.txt` agora orienta a revis+o com perguntas diretas:
   - `confirmar_categoria_principal: sim | nao` e `trecho_evidencia_<slug>` (para a categoria principal e as sugeridas) garantem que o revisor cole o trecho literal do documento.
-  - `acao_incluir_conhecimento_<slug>: sim | nao` controla se o trecho ser+í gravado como `knowledge_sources/<categoria>/feedback_<hash>.txt`, alimentando automaticamente a camada documental.
-  - `categoria_nome_<slug>` vem preenchido (n+úo alterar) e permite que o watcher associe o slug ao nome oficial da categoria.
+  - `acao_incluir_conhecimento_<slug>: sim | nao` controla se o trecho ser+ gravado como `knowledge_sources/<categoria>/feedback_<hash>.txt`, alimentando automaticamente a camada documental.
+  - `categoria_nome_<slug>` vem preenchido (n+o alterar) e permite que o watcher associe o slug ao nome oficial da categoria.
   - `categoria_alternativa_<slug>` e `areas_secundarias` consolidam categorias adicionais confirmadas pelo humano.
-- Cada feedback processado +® arquivado em `folders/feedback/processado/<categoria>/` e gera uma entrada completa no `feedback_history`, incluindo quais trechos viraram evid+¬ncia documental.
+- Cada feedback processado + arquivado em `folders/feedback/processado/<categoria>/` e gera uma entrada completa no `feedback_history`, incluindo quais trechos viraram evid+ncia documental.
 - O `FeedbackWatcher` passa a:
-  - recalibrar confian+ºa e +íreas secund+írias com base nas respostas,
-  - incorporar as evid+¬ncias aprovadas ao diret+¦rio da categoria (refrescando tokens e termos recorrentes),
-  - manter estat+¡sticas de aprova+º+úo/reprocessamento por categoria.
-- Ferramenta r+ípida: `tools/submit_feedback.py` continua dispon+¡vel para registrar corre+º+Áes simples via CLI (gera `.json` pronto em `folders/feedback/`). Use `--dry-run` para validar o conte+¦do antes de gravar.
+  - recalibrar confian+a e +reas secund+rias com base nas respostas,
+  - incorporar as evid+ncias aprovadas ao diret+rio da categoria (refrescando tokens e termos recorrentes),
+  - manter estat+sticas de aprova++o/reprocessamento por categoria.
+- Ferramenta r+pida: `tools/submit_feedback.py` continua dispon+vel para registrar corre++es simples via CLI (gera `.json` pronto em `folders/feedback/`). Use `--dry-run` para validar o conte+do antes de gravar.
 
 ## 8. Configuracao e parametros (.env)
-- Toda a configuracao vive no `.env`. Nunca commite credenciais. Copie `/.env.example` para `.env` e ajuste os valores que estao em branco.
+- Toda a configuracao vive no `.env`. Nunca commite credenciais. Copie o template ou gere um arquivo novo antes de editar.
 
 ### 8.0 Criando o arquivo `.env`
 ```powershell
-Copy-Item .env.example .env
+# Gera o .env com todos os defaults listados no template
+Get-Content .env.example | Set-Content -Path .env -Encoding UTF8
+```
+```powershell
+# Opcional: gerar o arquivo do zero (caso o template nao esteja disponivel)
+@"
+# (mesmo conteudo padrao presente em .env.example)
+DOC_ANALYZER_API_KEY=
+DOC_ANALYZER_MODEL=gpt-5
+DOC_ANALYZER_CROSS_MODEL=gpt-5
+DOC_ANALYZER_CONFIDENCE_THRESHOLD=0.8
+DOC_ANALYZER_POLL_INTERVAL=10
+DOC_ANALYZER_FEEDBACK_INTERVAL=15
+DOC_ANALYZER_PROCESSING_WORKERS=2
+DOC_ANALYZER_MAX_RETRIES=3
+DOC_ANALYZER_TEMPERATURE=1.0
+DOC_ANALYZER_REQUEST_TIMEOUT=60
+DOC_ANALYZER_LOG_LEVEL=INFO
+DOC_ANALYZER_LOG_FILE=logs/activity.jsonl
+DOC_ANALYZER_TEXT_LOG_FILE=logs/system.log
+DOC_ANALYZER_KNOWLEDGE_BASE_PATH=knowledge.json
+DOC_ANALYZER_CATEGORY_KNOWLEDGE_ROOT=knowledge_sources
+DOC_ANALYZER_STORAGE_MODE=relative
+DOC_ANALYZER_STORAGE_RELATIVE_ROOT=folders
+DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT=
+DOC_ANALYZER_STORAGE_AUTO_CREATE=true
+DOC_ANALYZER_STORAGE_CREATE_DEFAULT_CATEGORIES=true
+DOC_ANALYZER_INPUT_SUBDIR=entrada
+DOC_ANALYZER_PROCESSING_SUBDIR=em_processamento
+DOC_ANALYZER_PROCESSING_FAIL_SUBDIR=_falhas
+DOC_ANALYZER_PROCESSED_SUBDIR=processados
+DOC_ANALYZER_FEEDBACK_SUBDIR=feedback
+DOC_ANALYZER_FEEDBACK_PROCESSED_SUBDIR=processado
+DOC_ANALYZER_COMPLEX_SAMPLES_SUBDIR=complex_samples
+DOC_ANALYZER_TEAMS_WEBHOOK_URL=
+DOC_ANALYZER_TEAMS_ACTIVITY_WEBHOOK_URL=
+DOC_ANALYZER_USE_AZURE=false
+DOC_ANALYZER_AZURE_ENDPOINT=
+DOC_ANALYZER_AZURE_API_KEY=
+DOC_ANALYZER_AZURE_DEPLOYMENT=
+DOC_ANALYZER_AZURE_API_VERSION=2024-02-01
+DOC_ANALYZER_STORAGE_SERVICE_USER=
+DOC_ANALYZER_STORAGE_SERVICE_PASSWORD=
+DOC_ANALYZER_STORAGE_SERVICE_DOMAIN=
+DOC_ANALYZER_STORAGE_MOUNT_COMMAND=mount -t cifs //<servidor>/classificador /mnt/classificador -o user=$DOC_ANALYZER_STORAGE_SERVICE_USER,domain=$DOC_ANALYZER_STORAGE_SERVICE_DOMAIN
+OPENAI_API_KEY=
+TEAMS_WEBHOOK_URL=
+TEAMS_ACTIVITY_WEBHOOK_URL=
+"@ | Set-Content -Path .env -Encoding UTF8
 ```
 ```bash
+# Linux/macOS
 cp .env.example .env
 ```
-Esses comandos replicam o template com todos os defaults e deixam o arquivo pronto para receber as chaves reais em cada ambiente (dev/homolog/prod).
+Depois de criar o arquivo, preencha os campos marcados como TODO no proprio template.
 
 ### 8.1 Escolhendo onde as pastas vao morar (`DOC_ANALYZER_STORAGE_MODE`)
-- `relative` (default): base = `<pasta_onde_o_servico_roda>/<DOC_ANALYZER_STORAGE_RELATIVE_ROOT>`. Ex.: rodando em `/opt/classificador`, as pastas ficam em `/opt/classificador/folders/...`.
-- `absolute`: informe `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` (ex.: `D:/classificador_prod` ou `/srv/classificador`). O processo cria/usa `entrada`, `em_processamento`, etc dentro desse caminho. Antes de subir em producao, crie o diretorio e garanta permissao de escrita para o usuario do servico.
-- `network`: igual ao `absolute`, mas apontando para um compartilhamento montado (`\\fileserver\classificador`, `/mnt/classificador`, etc.). Monte o share antes de iniciar o servico e registre o comando em `DOC_ANALYZER_STORAGE_MOUNT_COMMAND`. Se a montagem usar credenciais, documente o usuario/senha/dominio nas variaveis `DOC_ANALYZER_STORAGE_SERVICE_*`.
+- `relative` (default): base = `<pasta_onde_o_servico_roda>/<DOC_ANALYZER_STORAGE_RELATIVE_ROOT>`. Exemplo: servico em `/opt/classificador` cria as pastas em `/opt/classificador/folders/...`.
+- `absolute`: defina `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` (ex.: `D:/classificador_prod` ou `/srv/classificador`). Antes do deploy, crie o diretorio e garanta permissao de escrita para o usuario do servico.
+- `network`: igual ao `absolute`, mas apontando para um compartilhamento montado (`\\fileserver\classificador`, `/mnt/classificador`, etc.). Monte o share antes de iniciar o servico e registre o comando de montagem em `DOC_ANALYZER_STORAGE_MOUNT_COMMAND`.
 > Se `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` ficar vazio, mesmo nos modos `absolute` ou `network`, o sistema volta a se comportar como `relative`.
+
+**Exemplos praticos**
+- Homolog local: `DOC_ANALYZER_STORAGE_MODE=relative`, `DOC_ANALYZER_STORAGE_RELATIVE_ROOT=homolog_folders`. O pipeline cria `homolog_folders/entrada`, `homolog_folders/processados`, etc. dentro da pasta do projeto.
+- Producao em Windows Server: `DOC_ANALYZER_STORAGE_MODE=absolute`, `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT=D:/classificador/producao`. Use `New-Item D:/classificador/producao -ItemType Directory -Force` antes de iniciar o servico.
+- Producoes com share Linux: `DOC_ANALYZER_STORAGE_MODE=network`, `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT=/mnt/classificador`, `DOC_ANALYZER_STORAGE_MOUNT_COMMAND=mount -t cifs //<servidor>/classificador /mnt/classificador -o user=$DOC_ANALYZER_STORAGE_SERVICE_USER`. Execute o comando (ou equivalente `net use` no Windows) no script de inicializacao.
 
 ### 8.2 Variaveis obrigatorias (LLM e pipeline)
 | Variavel | Descricao | Default / exemplo |
@@ -139,7 +193,7 @@ Esses comandos replicam o template com todos os defaults e deixam o arquivo pron
 | `DOC_ANALYZER_FEEDBACK_INTERVAL` | Intervalo (s) de varredura da pasta de feedback. | `15` |
 | `DOC_ANALYZER_PROCESSING_WORKERS` | Threads paralelas do `DocumentProcessor`. | `2` |
 | `DOC_ANALYZER_LOG_LEVEL` | Nivel de log (`DEBUG`, `INFO`, etc.). | `INFO` |
-| `DOC_ANALYZER_LOG_FILE` | Caminho do log estruturado (`.jsonl`). | `logs/activity.jsonl` |
+| `DOC_ANALYZER_LOG_FILE` | Caminho do log estruturado (JSONL). | `logs/activity.jsonl` |
 | `DOC_ANALYZER_TEXT_LOG_FILE` | Caminho do log textual. | `logs/system.log` |
 | `DOC_ANALYZER_KNOWLEDGE_BASE_PATH` | Arquivo JSON da base de conhecimento. | `knowledge.json` |
 | `DOC_ANALYZER_CATEGORY_KNOWLEDGE_ROOT` | Pasta com artefatos por categoria. | `knowledge_sources` |
@@ -147,7 +201,6 @@ Esses comandos replicam o template com todos os defaults e deixam o arquivo pron
 ### 8.3 Subpastas e estrutura interna
 | Variavel | Descricao | Default / exemplo |
 | --- | --- | --- |
-| `DOC_ANALYZER_STORAGE_MODE` | Modo de resolucao de pastas (`relative`, `absolute`, `network`). | `relative` |
 | `DOC_ANALYZER_STORAGE_RELATIVE_ROOT` | Base local quando o modo e `relative`. | `folders` |
 | `DOC_ANALYZER_STORAGE_ABSOLUTE_ROOT` | Base absoluta para `absolute` ou `network`. | `` |
 | `DOC_ANALYZER_STORAGE_AUTO_CREATE` | Cria automaticamente a estrutura se `true`. | `true` |
@@ -194,7 +247,7 @@ Esses comandos replicam o template com todos os defaults e deixam o arquivo pron
 ## 10. Manual operacional (usuarios finais)
 - Consultar `docs/manual_operacional.md` para o passo a passo sem comandos (entrada, notificacoes Teams, coleta dos ZIPs e envio de feedback).
 - Inclui orientacao para uso do `tools/feedback_gui.py`, que abre uma janela simples para registrar feedback sem utilizar o terminal.
-- Recomenda-se distribuir o manual em PDF ou wiki interna e criar atalhos para `tools/feedback_gui.py` nas esta+º+Áes da equipe.
+- Recomenda-se distribuir o manual em PDF ou wiki interna e criar atalhos para `tools/feedback_gui.py` nas esta++es da equipe.
 
 ## 11. Demonstracao de fluxo end-to-end
 1. Gere amostras: `python tools/create_sample_documents.py --drop-into-entrada`.
@@ -240,7 +293,7 @@ Esses comandos replicam o template com todos os defaults e deixam o arquivo pron
 - **Integracao Azure**: quando `DOC_ANALYZER_USE_AZURE=true`, execute `python - <<"PY"` carregando `from core.settings import load_settings; from core.gpt_core import GPTCore` para validar `gpt_core.ensure_available()` antes do deploy.
 
 ### 14.3 Rotina diaria de operacao
-- Monitorar `logs/system.log` (erros) e `logs/activity.jsonl` (eventos) – importar o JSONL em dashboards ajuda a rastrear gargalos e taxa de sucesso.
+- Monitorar `logs/system.log` (erros) e `logs/activity.jsonl` (eventos)  importar o JSONL em dashboards ajuda a rastrear gargalos e taxa de sucesso.
 - Conferir a fila de `em_processamento` a cada inicio de turno; se houver arquivos presos, abra o log e verifique o ultimo evento (`processing_internal_error`, `taxonomy_refinement`, etc.).
 - Validar que os webhooks continuam ativos (os Teams Cards mostram o ID do processo e o caminho gerado; se sumirem, revisar secret ou firewall).
 - Revisar `folders/em_processamento/_falhas` diariamente. Itens nessa pasta precisam de tratamento manual; depois de corrigir, mova o arquivo de volta para `entrada`.
