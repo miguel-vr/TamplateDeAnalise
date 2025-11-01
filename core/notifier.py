@@ -60,11 +60,12 @@ class TeamsNotifier:
             "body": card_body,
         }
         if link:
+            target_url = self._normalize_url(link)
             card["actions"] = [
                 {
                     "type": "Action.OpenUrl",
                     "title": "Abrir recurso",
-                    "url": link if link.startswith("http") else f"file:///{link.replace('\\', '/')}",
+                    "url": target_url,
                 }
             ]
         self._post_card(self.activity_webhook_url, card, title)
@@ -208,8 +209,20 @@ class TeamsNotifier:
                 {
                     "type": "Action.OpenUrl",
                     "title": "Abrir pasta do artefato",
-                    "url": f"file:///{zip_path.replace('\\', '/')}",
+                    "url": self._normalize_url(zip_path),
                 }
             ],
         }
         return card
+
+    @staticmethod
+    def _normalize_url(target: str) -> str:
+        value = (target or "").strip()
+        if not value:
+            return ""
+        lowered = value.lower()
+        if lowered.startswith(("http://", "https://", "file://")):
+            return value
+        sanitized = value.replace("\\", "/")
+        sanitized = sanitized.lstrip("/")
+        return f"file:///{sanitized}"

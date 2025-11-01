@@ -302,6 +302,15 @@ Depois de criar o arquivo, preencha os campos marcados como TODO no proprio temp
 - **Monitoramento**: utilize `logs/activity.jsonl` para integrar com dashboards (cada linha e um JSON independente). O campo `records` do evento `processing_timeline_summary` lista duracao de todas as etapas.
 - **Extensoes futuras**: para novos tipos de arquivo, adicione a extensao em `SUPPORTED_EXTENSIONS` e implemente o metodo `_read_<ext>()`; para novas notificacoes, estenda `TeamsNotifier` ou crie novos notifiers seguindo a mesma interface (`send_analysis_summary`). 
 - **Configuracao de credenciais**: antes de rodar em producao, defina as variaveis de ambiente (ou um `.env`) com as chaves reais (`AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_KEY`, `AZURE_OPENAI_DEPLOYMENT`, `OPENAI_API_VERSION`, `TEAMS_WEBHOOK_URL`, etc.).
+
+### 13.1 Executar como servico systemd (Linux)
+1. Garanta que o `.env` esteja preenchido e que o virtualenv (`.venv/bin/python`) tenha todas as dependencias (`pip install -r requirements.txt`).
+2. Conceda permissao de execucao: `chmod +x ops/install_linux_service.sh`.
+3. Instale o servico (executar como root/sudo): `sudo ops/install_linux_service.sh`. O script cria `/etc/systemd/system/gpt-document-classifier.service`, recarrega o daemon e inicia o processo.
+4. Para acompanhar o runtime utilize `journalctl -u gpt-document-classifier -f` ou `systemctl status gpt-document-classifier`.
+5. Para ajustar caminhos, usuario ou nomes exporte variaveis antes da execucao (ex.: `SERVICE_NAME`, `PYTHON_BIN`, `ENV_FILE`, `RUN_AS_USER`, `RUN_AS_GROUP`, `LOG_DIR`). Rode novamente o script sempre que editar o `.service`.
+6. Desativar/remover: `sudo systemctl disable --now gpt-document-classifier` seguido de `sudo rm /etc/systemd/system/gpt-document-classifier.service && sudo systemctl daemon-reload`.
+
 ## 14. Guia de operacao para a equipe (ferias)
 
 ### 14.1 Checklist de preparacao
