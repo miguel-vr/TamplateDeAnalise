@@ -212,6 +212,14 @@ class TaxonomyRuleEngine:
         matches_list = top_info.get("matches", [])
         key_terms = ", ".join(sorted(set(matches_list))[:5])
         best_kb_match = max((item.get("best_match", 0.0) for item in knowledge_matches), default=0.0)
+        word_count = max(1, len(text.split()))
+        unique_matches = len(set(matches_list))
+        coverage = unique_matches / max(3, word_count / 120)
+        coverage = max(0.0, min(1.0, coverage))
+        score_norm = min(1.0, top_score / (self.high_confidence_threshold * 2.0))
+        heuristic_ratio = round(min(0.75, (score_norm * 0.6) + (coverage * 0.4)), 4)
+        if best_kb_match >= 0.5:
+            heuristic_ratio = min(0.85, heuristic_ratio + 0.08)
 
         allow_promotion = (
             top_score >= self.promote_threshold
@@ -257,18 +265,18 @@ class TaxonomyRuleEngine:
                         f"(palavras-chave: {key_terms})."
                     )
 
-        heuristic_ratio = min(1.0, top_score / self.high_confidence_threshold)
         composite_scores = {
             "llm": round(float(result.get("confidence", 0.0)), 4),
-            "heuristic": round(heuristic_ratio, 4),
+            "heuristic": heuristic_ratio,
             "knowledge": round(float(best_kb_match), 4),
         }
         combined_confidence = (
-            composite_scores["llm"] * 0.5
-            + composite_scores["heuristic"] * 0.35
+            composite_scores["llm"] * 0.6
+            + composite_scores["heuristic"] * 0.25
             + composite_scores["knowledge"] * 0.15
         )
-        result["confidence"] = round(min(0.99, combined_confidence), 4)
+        final_confidence = max(baseline_confidence, combined_confidence)
+        result["confidence"] = round(min(0.99, final_confidence), 4)
         result["confidence_percent"] = round(result["confidence"] * 100, 2)
         result["taxonomy_report"] = {
             "scores": scores,
